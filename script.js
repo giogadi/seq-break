@@ -1,6 +1,10 @@
 // VECTOR STUFF
+function dot(u, v) {
+    return u.x*v.x + u.y*v.y;
+}
+
 function norm(v) {
-    return Math.sqrt(v.x*v.x + v.y*v.y);
+    return Math.sqrt(dot(v, v));
 }
 
 function scale(v, s) {
@@ -20,6 +24,11 @@ function add(u, v) {
     }
 }
 
+// 90 degrees rotated counter-clockwise from v.
+function rotate90Ccw(v) {
+    return { x: -v.y, y: v.x };
+}
+
 function rand2dInBounds(bounds) {
     return {
         x: bounds.min.x + Math.random() * (bounds.max.x - bounds.min.x),
@@ -27,11 +36,81 @@ function rand2dInBounds(bounds) {
     };
 }
 
+// Positive if point is on same side of plane as plane's normal vec
+function pointPlaneSignedDist(p, plane_p, plane_n) {
+    return dot(add(p, scale(plane_p, -1.0)), plane_n);
+}
+
+// poly's are arrays of 2d points (ccw)
+function findSeparatingPlaneInPoly1Faces(poly1, poly2) {
+    // poly1 faces to poly2 points
+    for (let i = 0; i < poly1.length; ++i) {
+        let u = poly1[i];
+        let v = (i == 0) ? poly1[poly1.length - 1] : poly1[i - 1];
+        let face_n = rotate90Ccw(add(v, scale(u, -1.0)));
+        let valid_sep_plane = true;
+        for (let j = 0; j < poly2.length; ++j) {
+            if (pointPlaneSignedDist(poly2[j], u, face_n) <= 0.0) {
+                valid_sep_plane = false;
+                break;
+            }
+        }
+        if (valid_sep_plane) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function doConvexPolygonsOverlap(poly1, poly2) {
+    return !findSeparatingPlaneInPoly1Faces(poly1, poly2) &&
+           !findSeparatingPlaneInPoly1Faces(poly2, poly1);
+}
+
 // SOUND SHIT
+const BASE_FREQS = [
+    55.0000, // A
+    58.2705, // A#
+    61.7354, // B
+    65.4064, // C
+    69.2957, // C#
+    73.4162, // D
+    77.7817, // D#
+    82.4069, // E
+    87.3071, // F
+    92.4986, // F#
+    97.9989, // G
+    103.826, // G#
+];
+
+const NOTES = {
+    A: 0,
+    A_S: 1,
+    B_F: 1,
+    B: 2,
+    C: 3,
+    C_S: 4,
+    D_F: 4,
+    D: 5,
+    D_S: 6,
+    E_F: 6,
+    E: 7,
+    F: 8,
+    F_S: 9,
+    G_F: 9,
+    G: 10,
+    G_S: 11,
+    A_F: 11
+};
+
+function getFreq(note, octave) {
+    return BASE_FREQS[note] * (1 << octave);
+}
+
 function initSynth(audioCtx) {
     let osc = audioCtx.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(getFreq(NOTES.A, 3), audioCtx.currentTime);
     gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
     osc.connect(gainNode);
@@ -46,9 +125,12 @@ function initSynth(audioCtx) {
 // OTHER
 function generateRandomEnemies(numEnemies, bounds) {
     let enemies = []
+    const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
     for (i = 0; i < numEnemies; ++i) {
         enemies.push({
-            pos: rand2dInBounds(bounds)
+            pos: rand2dInBounds(bounds),
+            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2),
+            alive: true
         });
     }
     return enemies;
@@ -70,8 +152,9 @@ let playerPos = {
     x: 0.5 * (bounds.min.x + bounds.max.x),
     y: 0.5 * (bounds.min.y + bounds.max.y)
 }
+let playerHeading = 0.0;
 
-let playerDir = { x: 0, y: 0 };
+let movementDir = { x: 0, y: 0 };
 let prevTimeMillis = -1.0;
 
 const enemySize = canvas.width / 20.0;
@@ -84,7 +167,7 @@ const SECONDS_PER_BEAT = 60.0 / BPM;
 const NUM_BEATS = 16;
 const LOOP_TIME = NUM_BEATS * SECONDS_PER_BEAT;
 let sequence = new Array(NUM_BEATS);
-sequence.fill(false);
+sequence.fill(-1);
 let loopElapsedTime = 0.0;
 let currentBeatIx = -1;
 
@@ -98,10 +181,10 @@ function onKeyDown(event) {
         return;
     }
     switch (event.key) {
-        case "w": playerDir.y += 1.0; break;
-        case "s": playerDir.y -= 1.0; break;
-        case "a": playerDir.x -= 1.0; break;
-        case "d": playerDir.x += 1.0; break;
+        case "w": movementDir.y -= 1.0; break;
+        case "s": movementDir.y += 1.0; break;
+        case "a": movementDir.x -= 1.0; break;
+        case "d": movementDir.x += 1.0; break;
         case "j": slashPressed = true; break;
     }
 }
@@ -111,10 +194,31 @@ function onKeyUp(event) {
         return;
     }
     switch (event.key) {
-        case "w": playerDir.y -= 1.0; break;
-        case "s": playerDir.y += 1.0; break;
-        case "a": playerDir.x += 1.0; break;
-        case "d": playerDir.x -= 1.0; break;
+        case "w": movementDir.y += 1.0; break;
+        case "s": movementDir.y -= 1.0; break;
+        case "a": movementDir.x += 1.0; break;
+        case "d": movementDir.x -= 1.0; break;
+    }
+}
+
+// TODO: This doesn't actually center the cells horizontally but it's whatever.
+function drawSequence(canvasCtx, numBeats, currentBeatIx, canvasWidth, canvasHeight) {    
+    let widthPadding = 0.1 * canvasWidth;
+    let cellSize = canvasWidth / 25.0;
+    let cellSpacing = (canvasWidth - (2 * widthPadding)) / numBeats;
+    let heightPadding = 0.1 * canvasHeight;
+    let currentPos = {
+        x: widthPadding,
+        y: canvasHeight - heightPadding - cellSize
+    };
+    for (i = 0; i < numBeats; ++i) {
+        if (i == currentBeatIx) {
+            canvasCtx.fillStyle = 'blue';
+        } else {
+            canvasCtx.fillStyle = 'white';
+        }
+        canvasCtx.fillRect(currentPos.x, currentPos.y, cellSize, cellSize);
+        currentPos.x += cellSpacing;
     }
 }
 
@@ -144,26 +248,57 @@ function update(timeMillis) {
         }
     }
 
+    let hitBox = null;
+    let enemyHitBoxes = [];
     if (slashPressed) {
-        slashPressed = false;
-        let oldCount = enemies.length;
-        enemies = enemies.filter(e => norm(add(e.pos, scale(playerPos, -1.0))) > 0.5*playerSize + 0.5*enemySize);
-        if (enemies.length < oldCount) {
-            sequence[currentBeatIx] = true;
+        let headingVec = {
+            x: Math.cos(playerHeading),
+            y: Math.sin(playerHeading)
+        };
+        let leftVec = rotate90Ccw(headingVec);
+        let front = scale(headingVec, 0.5*playerSize + playerSize);
+        let back = scale(headingVec, 0.5*playerSize);
+        let left = scale(leftVec, playerSize);
+        let right = scale(left, -1.0);
+        let frontLeft = add(playerPos, add(front, left));
+        let backLeft = add(playerPos, add(back, left));
+        let backRight = add(playerPos, add(back, right));
+        let frontRight = add(playerPos, add(front, right));
+        hitBox = [frontLeft, backLeft, backRight, frontRight];
+
+        for (let i = 0; i < enemies.length; ++i) {
+            let e = enemies[i];
+            let s = 0.5*enemySize;
+            let enemyHitBox = [
+                add(e.pos, { x: -s, y: s }),
+                add(e.pos, { x: -s, y: -s }),
+                add(e.pos, { x: s, y: -s }),
+                add(e.pos, { x: s, y: s })
+            ];
+            enemyHitBoxes.push(enemyHitBox);
+            if (!e.alive) {
+                continue;
+            }
+            if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
+                sequence[currentBeatIx] = e.note;
+                e.alive = false;                
+            }
         }
     }
 
     if (audioCtx !== null) {
-        if (newBeat && sequence[currentBeatIx]) {
+        if (newBeat && sequence[currentBeatIx] >= 0) {
+            synth.osc.frequency.setValueAtTime(sequence[currentBeatIx], audioCtx.currentTime);
             synth.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
             synth.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);
         }
     }
     
-    if (playerDir.x !== 0 || playerDir.y !== 0) {
-        playerPos = add(playerPos, scale(normalized(playerDir), playerSpeed * dt));
+    if (movementDir.x !== 0 || movementDir.y !== 0) {
+        playerPos = add(playerPos, scale(normalized(movementDir), playerSpeed * dt));
         playerPos.x = Math.max(Math.min(playerPos.x, bounds.max.x), bounds.min.x);
         playerPos.y = Math.max(Math.min(playerPos.y, bounds.max.y), bounds.min.y);
+        playerHeading = Math.atan2(movementDir.y, movementDir.x);
     }
 
     canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
@@ -172,20 +307,57 @@ function update(timeMillis) {
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw Player
+    canvasCtx.save();
     canvasCtx.fillStyle = 'red';
+    canvasCtx.translate(playerPos.x, playerPos.y);
+    canvasCtx.rotate(playerHeading);
+    canvasCtx.translate(-playerPos.x, -playerPos.y);
     canvasCtx.fillRect(playerPos.x - 0.5*playerSize,
-                       canvas.height - playerPos.y - 0.5*playerSize,
+                       playerPos.y - 0.5*playerSize,
                        playerSize, playerSize);
+    canvasCtx.translate(playerPos.x, playerPos.y);
+    const EYE_SIZE = 0.25*playerSize;
+    canvasCtx.fillStyle = 'black';
+    canvasCtx.fillRect(0.5*playerSize - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
+    canvasCtx.restore();
 
     // Draw Enemies
     canvasCtx.fillStyle = 'green';
+    canvasCtx.strokeStyle = 'white';
     for (i = 0; i < enemies.length; ++i) {
         let e = enemies[i];
+        if (!e.alive) {
+            continue;
+        }
         canvasCtx.fillRect(e.pos.x - 0.5*enemySize,
-                           canvas.height - e.pos.y - 0.5*enemySize,
+                           e.pos.y - 0.5*enemySize,
                            enemySize, enemySize);
+        if (slashPressed) {
+            let hb = enemyHitBoxes[i];
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(hb[hb.length - 1].x, hb[hb.length - 1].y);
+            for (let i = 0; i < hb.length; ++i) {
+                canvasCtx.lineTo(hb[i].x, hb[i].y);
+            }
+            canvasCtx.stroke();
+        }
     }
 
+    // Draw slash
+    if (slashPressed) {
+        canvas.strokeStyle = 'black';
+        console.assert(hitBox !== null);
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(hitBox[hitBox.length - 1].x, hitBox[hitBox.length - 1].y);
+        for (let i = 0; i < hitBox.length; ++i) {
+            canvasCtx.lineTo(hitBox[i].x, hitBox[i].y);
+        }
+        canvasCtx.stroke();
+    }
+
+    drawSequence(canvasCtx, NUM_BEATS, currentBeatIx, canvas.width, canvas.height);
+
+    slashPressed = false;
     window.requestAnimationFrame(update);
 }
 
