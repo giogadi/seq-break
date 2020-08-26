@@ -109,27 +109,88 @@ function getFreq(note, octave) {
 
 function initSynth(audioCtx) {
     let osc = audioCtx.createOscillator();
-    osc.type = 'triangle';
+    osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(getFreq(NOTES.A, 3), audioCtx.currentTime);
+    filterNode = audioCtx.createBiquadFilter();
+    osc.connect(filterNode);
     gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-    osc.connect(gainNode);
+    filterNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     osc.start();
     return {
         osc: osc,
+        filter: filterNode,
         gain: gainNode
     };
+}
+
+function getSoundData(filename) {
+    return new Promise(function(resolve, reject) {
+        let request = new XMLHttpRequest();
+        request.open(
+            'GET', 'http://' + window.location.hostname + ":2794/" + filename);
+        request.responseType = 'arraybuffer';
+        request.onload = function() {
+            resolve(request.response);
+        }
+        request.onerror = function() {
+            reject(request.statusText);
+        }
+        request.send();
+    });
+}
+
+function initSound(numSynths) {
+    let soundNames = ['kick', 'snare'];
+    let sounds = soundNames.map(function(soundName) {
+        return getSoundData(soundName + '.wav')
+    });
+    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return Promise.all(sounds).then(function(loadedSounds) {
+        return Promise.all(loadedSounds.map(function(loadedSound) {
+            return audioCtx.decodeAudioData(loadedSound);
+        }));
+    }).then(function(decodedSounds) {
+        let synths = [];
+        for (let i = 0; i < numSynths; ++i) {
+            synths.push(initSynth(audioCtx));
+        }
+        return {
+            audioCtx: audioCtx,
+            drumSounds: decodedSounds,
+            synths: synths
+        }
+    });
+}
+
+function playSoundFromBuffer(audioCtx, buffer) {
+    let source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
 }
 
 // OTHER
 function generateRandomEnemies(numEnemies, bounds) {
     let enemies = []
     const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+    // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
     for (i = 0; i < numEnemies; ++i) {
         enemies.push({
             pos: rand2dInBounds(bounds),
-            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2),
+            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3),
+            synth_ix: 0,
+            color: 'green',
+            alive: true
+        });
+    }
+    for (i = 0; i < numEnemies; ++i) {
+        enemies.push({
+            pos: rand2dInBounds(bounds),
+            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1),
+            synth_ix: 1,
+            color: 'darkgoldenrod',
             alive: true
         });
     }
@@ -139,8 +200,15 @@ function generateRandomEnemies(numEnemies, bounds) {
 // GLOBAL STATE
 let canvas = document.getElementById("canvas");
 let canvasCtx = canvas.getContext('2d');
-let audioCtx = null;
-let synth = null;
+
+let sound = null;
+let soundInitStarted = false;
+function sound_init_callback(s) {
+    sound = s;
+    console.log(s);
+} 
+
+let NUM_SYNTHS = 2;
 
 const bounds = {
     min: { x: 0.0, y: 0.0 },
@@ -166,16 +234,20 @@ const BPM = 4 * 120.0;
 const SECONDS_PER_BEAT = 60.0 / BPM;
 const NUM_BEATS = 16;
 const LOOP_TIME = NUM_BEATS * SECONDS_PER_BEAT;
-let sequence = new Array(NUM_BEATS);
-sequence.fill(-1);
+let kickSequence = new Array(NUM_BEATS).fill(false);
+kickSequence[0] = kickSequence[4] = kickSequence[8] = kickSequence[12] = true;
+let sequences = new Array(NUM_SYNTHS);
+for (let i = 0; i < NUM_SYNTHS; ++i) {
+    sequences[i] = new Array(NUM_BEATS).fill(-1);
+}
 let loopElapsedTime = 0.0;
 let currentBeatIx = -1;
 
 // EVENT HANDLING
 function onKeyDown(event) {
-    if (audioCtx === null) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        synth = initSynth(audioCtx);
+    if (!soundInitStarted) {
+        soundInitStarted = true;
+        initSound(NUM_SYNTHS).then(sound_init_callback);
     }
     if (event.repeat) {
         return;
@@ -280,17 +352,23 @@ function update(timeMillis) {
                 continue;
             }
             if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
-                sequence[currentBeatIx] = e.note;
+                sequences[e.synth_ix][currentBeatIx] = e.note;
                 e.alive = false;                
             }
         }
     }
 
-    if (audioCtx !== null) {
-        if (newBeat && sequence[currentBeatIx] >= 0) {
-            synth.osc.frequency.setValueAtTime(sequence[currentBeatIx], audioCtx.currentTime);
-            synth.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
-            synth.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);
+    if (sound !== null && newBeat) {
+        console.assert(sound.synths.length == NUM_SYNTHS, sound.synths.length);
+        for (let i = 0; i < NUM_SYNTHS; ++i) {
+            if (sequences[i][currentBeatIx] >= 0) {
+                sound.synths[i].osc.frequency.setValueAtTime(sequences[i][currentBeatIx], sound.audioCtx.currentTime);
+                sound.synths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
+                sound.synths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+            }
+        }
+        if (kickSequence[currentBeatIx]) {
+            playSoundFromBuffer(sound.audioCtx, sound.drumSounds[0]);
         }
     }
     
@@ -322,13 +400,13 @@ function update(timeMillis) {
     canvasCtx.restore();
 
     // Draw Enemies
-    canvasCtx.fillStyle = 'green';
     canvasCtx.strokeStyle = 'white';
     for (i = 0; i < enemies.length; ++i) {
         let e = enemies[i];
         if (!e.alive) {
             continue;
         }
+        canvasCtx.fillStyle = e.color;
         canvasCtx.fillRect(e.pos.x - 0.5*enemySize,
                            e.pos.y - 0.5*enemySize,
                            enemySize, enemySize);
