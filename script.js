@@ -129,7 +129,7 @@ function getSoundData(filename) {
     return new Promise(function(resolve, reject) {
         let request = new XMLHttpRequest();
         request.open(
-            'GET', 'http://' + window.location.hostname + ":2794/" + filename);
+            'GET', 'http://' + window.location.hostname + ":80/" + filename);
         request.responseType = 'arraybuffer';
         request.onload = function() {
             resolve(request.response);
@@ -156,10 +156,15 @@ function initSound(numSynths) {
         for (let i = 0; i < numSynths; ++i) {
             synths.push(initSynth(audioCtx));
         }
+        let auxSynths = [];
+        for (let i = 0; i < numSynths; ++i) {
+            auxSynths.push(initSynth(audioCtx));
+        }
         return {
             audioCtx: audioCtx,
             drumSounds: decodedSounds,
-            synths: synths
+            synths: synths,
+            auxSynths: auxSynths
         }
     });
 }
@@ -172,23 +177,39 @@ function playSoundFromBuffer(audioCtx, buffer) {
 }
 
 // OTHER
-function generateRandomEnemies(numEnemies, bounds) {
+function generateRandomEnemies(numBeats, numEnemies, bounds) {
     let enemies = []
     const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
     // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
     for (i = 0; i < numEnemies; ++i) {
+        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
+        // let sequence = new Array(numBeats).fill(-1);
+        // if (i % 2 == 0) {
+        //     // Down-beats
+        //     for (let j = 0; j < sequence.length; j += 4) {
+        //         sequence[j] = sequence[j+1] = randomNote;
+        //     }
+        // } else {
+        //     // Up-beats
+        //     for (let j = 2; j < sequence.length; j += 4) {
+        //         sequence[j] = sequence[j+1] = randomNote;
+        //     }
+        // }
+        let sequence = new Array(numBeats).fill(randomNote);
         enemies.push({
             pos: rand2dInBounds(bounds),
-            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3),
+            seq: sequence,
             synth_ix: 0,
             color: 'green',
             alive: true
         });
     }
     for (i = 0; i < numEnemies; ++i) {
+        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
+        let sequence = new Array(numBeats).fill(randomNote);
         enemies.push({
             pos: rand2dInBounds(bounds),
-            note: getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1),
+            seq: sequence,
             synth_ix: 1,
             color: 'darkgoldenrod',
             alive: true
@@ -225,10 +246,8 @@ let playerHeading = 0.0;
 let movementDir = { x: 0, y: 0 };
 let prevTimeMillis = -1.0;
 
-const enemySize = canvas.width / 20.0;
-let enemies = generateRandomEnemies(10, bounds);
-
 let slashPressed = false;
+let scanning = false;
 
 const BPM = 4 * 120.0;
 const SECONDS_PER_BEAT = 60.0 / BPM;
@@ -242,6 +261,9 @@ for (let i = 0; i < NUM_SYNTHS; ++i) {
 }
 let loopElapsedTime = 0.0;
 let currentBeatIx = -1;
+
+const enemySize = canvas.width / 20.0;
+let enemies = generateRandomEnemies(NUM_BEATS, 10, bounds);
 
 // EVENT HANDLING
 function onKeyDown(event) {
@@ -258,6 +280,7 @@ function onKeyDown(event) {
         case "a": movementDir.x -= 1.0; break;
         case "d": movementDir.x += 1.0; break;
         case "j": slashPressed = true; break;
+        case "k": scanning = true; break;
     }
 }
 
@@ -270,6 +293,7 @@ function onKeyUp(event) {
         case "s": movementDir.y -= 1.0; break;
         case "a": movementDir.x += 1.0; break;
         case "d": movementDir.x -= 1.0; break;
+        case "k": scanning = false; break;
     }
 }
 
@@ -351,9 +375,28 @@ function update(timeMillis) {
             if (!e.alive) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
-                sequences[e.synth_ix][currentBeatIx] = e.note;
-                e.alive = false;                
+            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[currentBeatIx] >= 0) {
+                let hitIx = (currentBeatIx + 1) % NUM_BEATS;
+                sequences[e.synth_ix][hitIx] = e.seq[currentBeatIx];
+                e.alive = false;
+            }
+        }
+    }
+
+    // Find nearest enemy (of each type)
+    let nearestEnemies = new Array(NUM_SYNTHS).fill(-1);
+    let nearestDists = new Array(NUM_SYNTHS).fill(-1);
+    if (scanning) {
+        for (let i = 0; i < enemies.length; ++i) {
+            let e = enemies[i];
+            if (!e.alive) {
+                continue;
+            }
+            let d = norm(add(e.pos, scale(playerPos, -1.0)));
+            if (nearestEnemies[e.synth_ix] == -1 ||
+                d < nearestDists[e.synth_ix]) {
+                nearestEnemies[e.synth_ix] = i;
+                nearestDists[e.synth_ix] = d;
             }
         }
     }
@@ -365,6 +408,15 @@ function update(timeMillis) {
                 sound.synths[i].osc.frequency.setValueAtTime(sequences[i][currentBeatIx], sound.audioCtx.currentTime);
                 sound.synths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
                 sound.synths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+            }
+
+            if (nearestEnemies[i] >= 0) {
+                let e = enemies[nearestEnemies[i]];
+                if (e.seq[currentBeatIx] >= 0) {
+                    sound.auxSynths[i].osc.frequency.setValueAtTime(e.seq[currentBeatIx], sound.audioCtx.currentTime);
+                    sound.auxSynths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
+                    sound.auxSynths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+                }
             }
         }
         if (kickSequence[currentBeatIx]) {
@@ -410,6 +462,26 @@ function update(timeMillis) {
         canvasCtx.fillRect(e.pos.x - 0.5*enemySize,
                            e.pos.y - 0.5*enemySize,
                            enemySize, enemySize);
+        if (e.seq[currentBeatIx] < 0) {
+            // draw a barrier
+            canvasCtx.strokeRect(
+                e.pos.x - 0.6*enemySize,
+                e.pos.y - 0.6*enemySize,
+                1.2*enemySize, 1.2*enemySize);
+        }
+        let isAClosestEnemy = false;
+        for (let j = 0; j < nearestEnemies.length; ++j) {
+            if (nearestEnemies[j] == i) {
+                isAClosestEnemy = true;
+            }
+        }
+        if (isAClosestEnemy) {
+            canvasCtx.fillStyle = 'black';
+            canvasCtx.fillRect(
+                e.pos.x - 0.05*enemySize,
+                e.pos.y - 0.05*enemySize,
+                0.1*enemySize, 0.1*enemySize);
+        }
         if (slashPressed) {
             let hb = enemyHitBoxes[i];
             canvasCtx.beginPath();
