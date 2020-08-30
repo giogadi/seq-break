@@ -183,6 +183,7 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
     // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
     for (i = 0; i < numEnemies; ++i) {
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
+        // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
         // let sequence = new Array(numBeats).fill(-1);
         // if (i % 2 == 0) {
         //     // Down-beats
@@ -195,7 +196,10 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
         //         sequence[j] = sequence[j+1] = randomNote;
         //     }
         // }
-        let sequence = new Array(numBeats).fill(randomNote);
+        let sequence = new Array(numBeats).fill({
+            note: randomNote,
+            sustain: false
+        });
         enemies.push({
             pos: rand2dInBounds(bounds),
             seq: sequence,
@@ -206,12 +210,29 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
     }
     for (i = 0; i < numEnemies; ++i) {
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
-        let sequence = new Array(numBeats).fill(randomNote);
+        let sequence = new Array(numBeats).fill({
+            note: randomNote,
+            sustain: false
+        });
         enemies.push({
             pos: rand2dInBounds(bounds),
             seq: sequence,
             synth_ix: 1,
             color: 'darkgoldenrod',
+            alive: true
+        });
+    }
+    for (i = 0; i < numEnemies; ++i) {
+        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
+        let sequence = new Array(numBeats).fill({
+            note: randomNote,
+            sustain: true
+        });
+        enemies.push({
+            pos: rand2dInBounds(bounds),
+            seq: sequence,
+            synth_ix: 2,
+            color: 'purple',
             alive: true
         });
     }
@@ -229,7 +250,7 @@ function sound_init_callback(s) {
     console.log(s);
 } 
 
-let NUM_SYNTHS = 2;
+let NUM_SYNTHS = 3;
 
 const bounds = {
     min: { x: 0.0, y: 0.0 },
@@ -248,6 +269,7 @@ let prevTimeMillis = -1.0;
 
 let slashPressed = false;
 let scanning = false;
+let sustaining = false;
 
 const BPM = 4 * 120.0;
 const SECONDS_PER_BEAT = 60.0 / BPM;
@@ -257,7 +279,10 @@ let kickSequence = new Array(NUM_BEATS).fill(false);
 kickSequence[0] = kickSequence[4] = kickSequence[8] = kickSequence[12] = true;
 let sequences = new Array(NUM_SYNTHS);
 for (let i = 0; i < NUM_SYNTHS; ++i) {
-    sequences[i] = new Array(NUM_BEATS).fill(-1);
+    sequences[i] = new Array(NUM_BEATS).fill({
+        note: -1,
+        sustain: false
+    });
 }
 let loopElapsedTime = 0.0;
 let currentBeatIx = -1;
@@ -281,6 +306,7 @@ function onKeyDown(event) {
         case "d": movementDir.x += 1.0; break;
         case "j": slashPressed = true; break;
         case "k": scanning = true; break;
+        case "l": sustaining = true; break;
     }
 }
 
@@ -294,6 +320,7 @@ function onKeyUp(event) {
         case "a": movementDir.x += 1.0; break;
         case "d": movementDir.x -= 1.0; break;
         case "k": scanning = false; break;
+        case "l": sustaining = false; break;
     }
 }
 
@@ -346,7 +373,7 @@ function update(timeMillis) {
 
     let hitBox = null;
     let enemyHitBoxes = [];
-    if (slashPressed) {
+    if (slashPressed || sustaining) {
         let headingVec = {
             x: Math.cos(playerHeading),
             y: Math.sin(playerHeading)
@@ -375,10 +402,12 @@ function update(timeMillis) {
             if (!e.alive) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[currentBeatIx] >= 0) {
+            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[currentBeatIx].note >= 0) {
                 let hitIx = (currentBeatIx + 1) % NUM_BEATS;
                 sequences[e.synth_ix][hitIx] = e.seq[currentBeatIx];
-                e.alive = false;
+                if (e.synth_ix !== 2) {
+                    e.alive = false;
+                }
             }
         }
     }
@@ -404,19 +433,31 @@ function update(timeMillis) {
     if (sound !== null && newBeat) {
         console.assert(sound.synths.length == NUM_SYNTHS, sound.synths.length);
         for (let i = 0; i < NUM_SYNTHS; ++i) {
-            if (sequences[i][currentBeatIx] >= 0) {
-                sound.synths[i].osc.frequency.setValueAtTime(sequences[i][currentBeatIx], sound.audioCtx.currentTime);
-                sound.synths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
-                sound.synths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+            if (sequences[i][currentBeatIx].note >= 0) {
+                sound.synths[i].osc.frequency.setValueAtTime(sequences[i][currentBeatIx].note, sound.audioCtx.currentTime);
+                // TODO THIS IS UGLY, we need to make it easier to assign different gains to different synths/notes.
+                let g = (i == 2) ? 0.4 : 1.0;
+                sound.synths[i].gain.gain.linearRampToValueAtTime(g, sound.audioCtx.currentTime + 0.01);
+                if (!sequences[i][currentBeatIx].sustain) {
+                    sound.synths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+                }
+            } else {
+                sound.synths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
             }
 
             if (nearestEnemies[i] >= 0) {
                 let e = enemies[nearestEnemies[i]];
-                if (e.seq[currentBeatIx] >= 0) {
-                    sound.auxSynths[i].osc.frequency.setValueAtTime(e.seq[currentBeatIx], sound.audioCtx.currentTime);
+                if (e.seq[currentBeatIx].note < 0) {
+                    sound.auxSynths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
+                } else {
+                    sound.auxSynths[i].osc.frequency.setValueAtTime(e.seq[currentBeatIx].note, sound.audioCtx.currentTime);
                     sound.auxSynths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
-                    sound.auxSynths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+                    if (!e.seq[currentBeatIx].sustain) {
+                        sound.auxSynths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
+                    }
                 }
+            } else {
+                sound.auxSynths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
             }
         }
         if (kickSequence[currentBeatIx]) {
