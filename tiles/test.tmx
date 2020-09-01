@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.4" tiledversion="1.4.2" orientation="orthogonal" renderorder="right-down" width="8" height="6" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+ <editorsettings>
+  <export target="test_tiles.json" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" source="dungeon.tsx"/>
+ <layer id="1" name="Tile Layer 1" width="8" height="6">
+  <data encoding="csv">
+32,34,34,34,34,33,34,35,
+62,64,65,64,62,63,65,64,
+122,129,130,131,129,131,131,180,
+151,184,183,184,182,185,189,135,
+151,183,183,188,183,184,185,136,
+151,183,183,185,183,186,185,135
+</data>
+ </layer>
+</map>

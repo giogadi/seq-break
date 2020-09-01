@@ -338,9 +338,17 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
 // GLOBAL STATE
 let canvas = document.getElementById("canvas");
 let canvasCtx = canvas.getContext('2d');
+let tileSetCanvas = null;
+let tileSetCanvasCtx = null;
+
+let g_initialized = false;
+let g_initKeyPressed = false;
+let g_imagesLoaded = false;
+
+// TEST
+let g_tiles = [32, 34, 34, 34, 34, 33, 34, 35, 62, 64, 65, 64, 62, 63, 65, 64, 122, 129, 130, 131, 129, 131, 131, 180, 151, 184, 183, 184, 182, 185, 189, 135, 151, 183, 183, 188, 183, 184, 185, 136, 151, 183, 183, 185, 183, 186, 185, 135];
 
 let sound = null;
-let soundInitStarted = false;
 function sound_init_callback(s) {
     sound = s;
     console.log(s);
@@ -388,10 +396,6 @@ let enemies = generateRandomEnemies(NUM_BEATS, 10, bounds);
 
 // EVENT HANDLING
 function onKeyDown(event) {
-    if (!soundInitStarted) {
-        soundInitStarted = true;
-        initSound(NUM_SYNTHS).then(sound_init_callback);
-    }
     if (event.repeat) {
         return;
     }
@@ -448,6 +452,17 @@ function update(timeMillis) {
         window.requestAnimationFrame(update);
         return;
     }
+    if (!g_initialized) {
+        if (g_initKeyPressed && sound !== null && g_imagesLoaded) {
+            g_initialized = true;
+        } else {
+            canvasCtx.font = '48px serif';
+            canvasCtx.fillText('Please press the space bar to start', 10, 50);
+            window.requestAnimationFrame(update);
+            return;
+        }
+    }
+
     let dt = (timeMillis - prevTimeMillis) * 0.001;
     prevTimeMillis = timeMillis;
 
@@ -566,6 +581,16 @@ function update(timeMillis) {
     // Fill bg
     canvasCtx.fillStyle = 'grey';
     canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // TEST
+    for (let i = 0; i < 8; ++i) {
+        for (let j = 0; j < 6; ++j) {
+            let tileIdx = g_tiles[j*8 + i] - 1;
+            let tile_j = Math.floor(tileIdx / 30);
+            let tile_i = tileIdx % 30;
+            canvasCtx.drawImage(tileSetCanvas, tile_i * 100, tile_j * 100, 100, 100, i*100, j*100, 100, 100);
+        }
+    }
 
     // Draw Player
     canvasCtx.save();
@@ -641,6 +666,40 @@ function update(timeMillis) {
     slashPressed = false;
     window.requestAnimationFrame(update);
 }
+
+function initKeyCallback(event) {
+    if (event.repeat) {
+        return;
+    }
+    if (event.key == ' ') {
+        initSound(NUM_SYNTHS).then(sound_init_callback);
+        g_initKeyPressed = true;
+        window.removeEventListener("keydown", initKeyCallback);
+    }
+}
+window.addEventListener("keydown", initKeyCallback);
+
+function onImgLoaded(event) {
+    let tileSetWidthTiles = 30;
+    let tileSetHeightTiles = 32;
+    let desiredPxPerTile = 100.0;
+    tileSetCanvas = new OffscreenCanvas(tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
+    tileSetCanvasCtx = tileSetCanvas.getContext('2d');
+    tileSetCanvasCtx.mozImageSmoothingEnabled = false;
+    tileSetCanvasCtx.webkitImageSmoothingEnabled = false;
+    tileSetCanvasCtx.msImageSmoothingEnabled = false;
+    tileSetCanvasCtx.imageSmoothingEnabled = false;
+    tileSetCanvasCtx.drawImage(event.target, 0, 0, tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
+    g_imagesLoaded = true;
+}
+
+function loadImages() {
+    let tileSetImg = new Image();
+    tileSetImg.addEventListener('load', onImgLoaded);
+    tileSetImg.src = 'tiles/dungeon tileset calciumtrice simple.png';
+}
+
+loadImages();
 
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
