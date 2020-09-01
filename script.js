@@ -107,22 +107,81 @@ function getFreq(note, octave) {
     return BASE_FREQS[note] * (1 << octave);
 }
 
-function initSynth(audioCtx) {
-    let osc = audioCtx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(getFreq(NOTES.A, 3), audioCtx.currentTime);
+function initSynth(audioCtx, synthSpec) {
+    // TODO: consider making this more efficient if no modulation gain/freq are 0.
     filterNode = audioCtx.createBiquadFilter();
-    osc.connect(filterNode);
+    filterNode.type = 'lowpass';
+    filterNode.frequency.setValueAtTime(synthSpec.filterCutoff, audioCtx.currentTime);
+    filterModFreq = audioCtx.createOscillator();
+    filterModFreq.frequency.setValueAtTime(synthSpec.filterModFreq, audioCtx.currentTime);
+    filterModGain = audioCtx.createGain();
+    filterModGain.gain.setValueAtTime(synthSpec.filterModGain, audioCtx.currentTime);
+    filterModFreq.connect(filterModGain).connect(filterNode.frequency);
+    filterModFreq.start();
+
     gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(synthSpec.gain, audioCtx.currentTime);
     filterNode.connect(gainNode);
     gainNode.connect(audioCtx.destination);
-    osc.start();
+    let voices = [];
+    for (let i = 0; i < synthSpec.voiceSpecs.length; ++i) {
+        // TODO: consider making this more efficient if osc2Gain == 0 by only initializing one oscillator.
+        let osc2Detune = synthSpec.voiceSpecs[i].osc2Detune;
+        let osc2GainValue = synthSpec.voiceSpecs[i].osc2Gain;
+
+        let defaultFreq = getFreq(NOTES.A, 3);
+
+        let osc1 = audioCtx.createOscillator();
+        osc1.type = synthSpec.voiceSpecs[i].osc1Type;
+        osc1.frequency.setValueAtTime(defaultFreq, audioCtx.currentTime);
+
+        let osc2 = audioCtx.createOscillator();
+        osc2.type = synthSpec.voiceSpecs[i].osc2Type;
+        osc2.detune.setValueAtTime(osc2Detune, audioCtx.currentTime);
+        osc2.frequency.setValueAtTime(defaultFreq, audioCtx.currentTime);
+
+        let voiceGainNode = audioCtx.createGain();
+        voiceGainNode.gain.setValueAtTime(0.0, audioCtx.currentTime);
+        voiceGainNode.connect(filterNode);
+        osc1.connect(voiceGainNode);
+        let osc2GainNode = audioCtx.createGain();
+        osc2GainNode.gain.setValueAtTime(osc2GainValue, audioCtx.currentTime);
+        osc2GainNode.connect(voiceGainNode);
+        osc2.connect(osc2GainNode);
+
+        osc1.start();
+        osc2.start();
+
+        voices.push({
+            osc1: osc1,
+            osc2: osc2,
+            gain: voiceGainNode,
+            osc2Gain: osc2GainNode,
+        });
+    }
+
     return {
-        osc: osc,
+        voices: voices,
         filter: filterNode,
+        filterModFreq: filterModFreq,
+        filterModGain: filterModGain,
         gain: gainNode
     };
+}
+
+function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx) {
+    let voice = synth.voices[voiceIdx];
+    voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
+    if (!sustain) {
+        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);
+    }
+}
+
+function synthReleaseVoice(synth, voiceIdx, audioCtx) {
+    let voice = synth.voices[voiceIdx];
+    voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
 }
 
 function getSoundData(filename) {
@@ -141,7 +200,7 @@ function getSoundData(filename) {
     });
 }
 
-function initSound(numSynths) {
+function initSound(synthSpecs) {
     let soundNames = ['kick', 'snare'];
     let sounds = soundNames.map(function(soundName) {
         return getSoundData(soundName + '.wav')
@@ -152,14 +211,51 @@ function initSound(numSynths) {
             return audioCtx.decodeAudioData(loadedSound);
         }));
     }).then(function(decodedSounds) {
+        let voiceSpec = {
+            osc1Type: 'sawtooth',
+            osc2Type: 'sawtooth',
+            osc2Gain: 0.7,
+            osc2Detune: 30 // cents
+        };
+        let synthSpecs = [
+            {
+                gain: 1.0,
+                filterCutoff: 9999,
+                filterModFreq: 0,
+                filterModGain: 0,
+                voiceSpecs: [voiceSpec]
+            },
+            {
+                gain: 1.0,
+                filterCutoff: 9999,
+                filterModFreq: 0,
+                filterModGain: 0,
+                voiceSpecs: [voiceSpec]
+            },
+            {
+                gain: 0.25,
+                filterCutoff: 600,
+                filterModFreq: 5,
+                filterModGain: 250,
+                voiceSpecs: [
+                    {
+                        osc1Type: 'sawtooth',
+                        osc2Type: 'sawtooth',
+                        osc2Gain: 0.7,
+                        osc2Detune: 30
+                    }
+                ]
+            }
+        ];
         let synths = [];
-        for (let i = 0; i < numSynths; ++i) {
-            synths.push(initSynth(audioCtx));
-        }
         let auxSynths = [];
-        for (let i = 0; i < numSynths; ++i) {
-            auxSynths.push(initSynth(audioCtx));
+        for (let i = 0; i < synthSpecs.length; ++i) {
+            synths.push(initSynth(audioCtx, synthSpecs[i]));
+            auxSynths.push(initSynth(audioCtx, synthSpecs[i]));
         }
+        // TODO BLAH
+        synths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
+        auxSynths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
         return {
             audioCtx: audioCtx,
             drumSounds: decodedSounds,
@@ -434,30 +530,24 @@ function update(timeMillis) {
         console.assert(sound.synths.length == NUM_SYNTHS, sound.synths.length);
         for (let i = 0; i < NUM_SYNTHS; ++i) {
             if (sequences[i][currentBeatIx].note >= 0) {
-                sound.synths[i].osc.frequency.setValueAtTime(sequences[i][currentBeatIx].note, sound.audioCtx.currentTime);
-                // TODO THIS IS UGLY, we need to make it easier to assign different gains to different synths/notes.
-                let g = (i == 2) ? 0.4 : 1.0;
-                sound.synths[i].gain.gain.linearRampToValueAtTime(g, sound.audioCtx.currentTime + 0.01);
-                if (!sequences[i][currentBeatIx].sustain) {
-                    sound.synths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
-                }
+                synthPlayVoice(
+                    sound.synths[i], 0, sequences[i][currentBeatIx].note,
+                    sequences[i][currentBeatIx].sustain, sound.audioCtx);
             } else {
-                sound.synths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
+                synthReleaseVoice(sound.synths[i], 0, sound.audioCtx);
             }
 
             if (nearestEnemies[i] >= 0) {
                 let e = enemies[nearestEnemies[i]];
-                if (e.seq[currentBeatIx].note < 0) {
-                    sound.auxSynths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
+                if (e.seq[currentBeatIx].note >= 0) {
+                    synthPlayVoice(
+                        sound.auxSynths[i], 0, e.seq[currentBeatIx].note,
+                        e.seq[currentBeatIx].sustain, sound.audioCtx);
                 } else {
-                    sound.auxSynths[i].osc.frequency.setValueAtTime(e.seq[currentBeatIx].note, sound.audioCtx.currentTime);
-                    sound.auxSynths[i].gain.gain.linearRampToValueAtTime(1.0, sound.audioCtx.currentTime + 0.01);
-                    if (!e.seq[currentBeatIx].sustain) {
-                        sound.auxSynths[i].gain.gain.linearRampToValueAtTime(0.0, sound.audioCtx.currentTime + 0.1);
-                    }
+                    synthReleaseVoice(sound.auxSynths[i], 0, sound.audioCtx);
                 }
             } else {
-                sound.auxSynths[i].gain.gain.setValueAtTime(0.0, sound.audioCtx.currentTime);
+                synthReleaseVoice(sound.auxSynths[i], 0, sound.audioCtx);
             }
         }
         if (kickSequence[currentBeatIx]) {
