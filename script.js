@@ -1,278 +1,3 @@
-// VECTOR STUFF
-function dot(u, v) {
-    return u.x*v.x + u.y*v.y;
-}
-
-function norm(v) {
-    return Math.sqrt(dot(v, v));
-}
-
-function scale(v, s) {
-    return { x: v.x * s, y: v.y * s };
-}
-
-function normalized(v) {
-    let d = norm(v);
-    console.assert(d > 0.00001, v);
-    return scale(v, 1.0 / d);
-}
-
-function add(u, v) {
-    return {
-        x: u.x + v.x,
-        y: u.y + v.y
-    }
-}
-
-// 90 degrees rotated counter-clockwise from v.
-function rotate90Ccw(v) {
-    return { x: -v.y, y: v.x };
-}
-
-function rand2dInBounds(bounds) {
-    return {
-        x: bounds.min.x + Math.random() * (bounds.max.x - bounds.min.x),
-        y: bounds.min.y + Math.random() * (bounds.max.y - bounds.min.y)
-    };
-}
-
-// Positive if point is on same side of plane as plane's normal vec
-function pointPlaneSignedDist(p, plane_p, plane_n) {
-    return dot(add(p, scale(plane_p, -1.0)), plane_n);
-}
-
-// poly's are arrays of 2d points (ccw)
-function findSeparatingPlaneInPoly1Faces(poly1, poly2) {
-    // poly1 faces to poly2 points
-    for (let i = 0; i < poly1.length; ++i) {
-        let u = poly1[i];
-        let v = (i == 0) ? poly1[poly1.length - 1] : poly1[i - 1];
-        let face_n = rotate90Ccw(add(v, scale(u, -1.0)));
-        let valid_sep_plane = true;
-        for (let j = 0; j < poly2.length; ++j) {
-            if (pointPlaneSignedDist(poly2[j], u, face_n) <= 0.0) {
-                valid_sep_plane = false;
-                break;
-            }
-        }
-        if (valid_sep_plane) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function doConvexPolygonsOverlap(poly1, poly2) {
-    return !findSeparatingPlaneInPoly1Faces(poly1, poly2) &&
-           !findSeparatingPlaneInPoly1Faces(poly2, poly1);
-}
-
-// SOUND SHIT
-const BASE_FREQS = [
-    55.0000, // A
-    58.2705, // A#
-    61.7354, // B
-    65.4064, // C
-    69.2957, // C#
-    73.4162, // D
-    77.7817, // D#
-    82.4069, // E
-    87.3071, // F
-    92.4986, // F#
-    97.9989, // G
-    103.826, // G#
-];
-
-const NOTES = {
-    A: 0,
-    A_S: 1,
-    B_F: 1,
-    B: 2,
-    C: 3,
-    C_S: 4,
-    D_F: 4,
-    D: 5,
-    D_S: 6,
-    E_F: 6,
-    E: 7,
-    F: 8,
-    F_S: 9,
-    G_F: 9,
-    G: 10,
-    G_S: 11,
-    A_F: 11
-};
-
-function getFreq(note, octave) {
-    return BASE_FREQS[note] * (1 << octave);
-}
-
-function initSynth(audioCtx, synthSpec) {
-    // TODO: consider making this more efficient if no modulation gain/freq are 0.
-    filterNode = audioCtx.createBiquadFilter();
-    filterNode.type = 'lowpass';
-    filterNode.frequency.setValueAtTime(synthSpec.filterCutoff, audioCtx.currentTime);
-    filterModFreq = audioCtx.createOscillator();
-    filterModFreq.frequency.setValueAtTime(synthSpec.filterModFreq, audioCtx.currentTime);
-    filterModGain = audioCtx.createGain();
-    filterModGain.gain.setValueAtTime(synthSpec.filterModGain, audioCtx.currentTime);
-    filterModFreq.connect(filterModGain).connect(filterNode.frequency);
-    filterModFreq.start();
-
-    gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(synthSpec.gain, audioCtx.currentTime);
-    filterNode.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    let voices = [];
-    for (let i = 0; i < synthSpec.voiceSpecs.length; ++i) {
-        // TODO: consider making this more efficient if osc2Gain == 0 by only initializing one oscillator.
-        let osc2Detune = synthSpec.voiceSpecs[i].osc2Detune;
-        let osc2GainValue = synthSpec.voiceSpecs[i].osc2Gain;
-
-        let defaultFreq = getFreq(NOTES.A, 3);
-
-        let osc1 = audioCtx.createOscillator();
-        osc1.type = synthSpec.voiceSpecs[i].osc1Type;
-        osc1.frequency.setValueAtTime(defaultFreq, audioCtx.currentTime);
-
-        let osc2 = audioCtx.createOscillator();
-        osc2.type = synthSpec.voiceSpecs[i].osc2Type;
-        osc2.detune.setValueAtTime(osc2Detune, audioCtx.currentTime);
-        osc2.frequency.setValueAtTime(defaultFreq, audioCtx.currentTime);
-
-        let voiceGainNode = audioCtx.createGain();
-        voiceGainNode.gain.setValueAtTime(0.0, audioCtx.currentTime);
-        voiceGainNode.connect(filterNode);
-        osc1.connect(voiceGainNode);
-        let osc2GainNode = audioCtx.createGain();
-        osc2GainNode.gain.setValueAtTime(osc2GainValue, audioCtx.currentTime);
-        osc2GainNode.connect(voiceGainNode);
-        osc2.connect(osc2GainNode);
-
-        osc1.start();
-        osc2.start();
-
-        voices.push({
-            osc1: osc1,
-            osc2: osc2,
-            gain: voiceGainNode,
-            osc2Gain: osc2GainNode,
-        });
-    }
-
-    return {
-        voices: voices,
-        filter: filterNode,
-        filterModFreq: filterModFreq,
-        filterModGain: filterModGain,
-        gain: gainNode
-    };
-}
-
-function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx) {
-    let voice = synth.voices[voiceIdx];
-    voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
-    if (!sustain) {
-        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);
-    }
-}
-
-function synthReleaseVoice(synth, voiceIdx, audioCtx) {
-    let voice = synth.voices[voiceIdx];
-    voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-}
-
-function getSoundData(filename) {
-    return new Promise(function(resolve, reject) {
-        let request = new XMLHttpRequest();
-        request.open(
-            'GET', 'http://' + window.location.hostname + ":80/" + filename);
-        request.responseType = 'arraybuffer';
-        request.onload = function() {
-            resolve(request.response);
-        }
-        request.onerror = function() {
-            reject(request.statusText);
-        }
-        request.send();
-    });
-}
-
-function initSound(synthSpecs) {
-    let soundNames = ['kick', 'snare'];
-    let sounds = soundNames.map(function(soundName) {
-        return getSoundData(soundName + '.wav')
-    });
-    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return Promise.all(sounds).then(function(loadedSounds) {
-        return Promise.all(loadedSounds.map(function(loadedSound) {
-            return audioCtx.decodeAudioData(loadedSound);
-        }));
-    }).then(function(decodedSounds) {
-        let voiceSpec = {
-            osc1Type: 'sawtooth',
-            osc2Type: 'sawtooth',
-            osc2Gain: 0.7,
-            osc2Detune: 30 // cents
-        };
-        let synthSpecs = [
-            {
-                gain: 1.0,
-                filterCutoff: 9999,
-                filterModFreq: 0,
-                filterModGain: 0,
-                voiceSpecs: [voiceSpec]
-            },
-            {
-                gain: 1.0,
-                filterCutoff: 9999,
-                filterModFreq: 0,
-                filterModGain: 0,
-                voiceSpecs: [voiceSpec]
-            },
-            {
-                gain: 0.25,
-                filterCutoff: 600,
-                filterModFreq: 5,
-                filterModGain: 250,
-                voiceSpecs: [
-                    {
-                        osc1Type: 'sawtooth',
-                        osc2Type: 'sawtooth',
-                        osc2Gain: 0.7,
-                        osc2Detune: 30
-                    }
-                ]
-            }
-        ];
-        let synths = [];
-        let auxSynths = [];
-        for (let i = 0; i < synthSpecs.length; ++i) {
-            synths.push(initSynth(audioCtx, synthSpecs[i]));
-            auxSynths.push(initSynth(audioCtx, synthSpecs[i]));
-        }
-        // TODO BLAH
-        synths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
-        auxSynths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
-        return {
-            audioCtx: audioCtx,
-            drumSounds: decodedSounds,
-            synths: synths,
-            auxSynths: auxSynths
-        }
-    });
-}
-
-function playSoundFromBuffer(audioCtx, buffer) {
-    let source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
-    source.start(0);
-}
-
-// OTHER
 function generateRandomEnemies(numBeats, numEnemies, bounds) {
     let enemies = []
     const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
@@ -335,92 +60,93 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
     return enemies;
 }
 
-// GLOBAL STATE
-let canvas = document.getElementById("canvas");
-let canvasCtx = canvas.getContext('2d');
-let tileSetCanvas = null;
-let tileSetCanvasCtx = null;
+class GameState {
+    constructor(canvas, sound, tileSetImg) {
+        this.canvas = canvas;
+        this.canvasCtx = canvas.getContext('2d');
+        this.sound = sound;
 
-let g_initialized = false;
-let g_initKeyPressed = false;
-let g_imagesLoaded = false;
+        this.playerSpeed = canvas.width / 2.5;
+        this.playerSize = canvas.width  / 20.0;
+        let b = this.bounds();
+        this.playerPos = vecScale(vecAdd(b.min, b.max), 0.5);
+        this.playerHeading = 0.0;
 
-// TEST
-let g_tiles = [32, 34, 34, 34, 34, 33, 34, 35, 62, 64, 65, 64, 62, 63, 65, 64, 122, 129, 130, 131, 129, 131, 131, 180, 151, 184, 183, 184, 182, 185, 189, 135, 151, 183, 183, 188, 183, 184, 185, 136, 151, 183, 183, 185, 183, 186, 185, 135];
+        this.BPM = 4 * 120.0;
+        this.SECONDS_PER_BEAT = 60.0 / this.BPM;
+        this.NUM_BEATS = 16;
+        this.LOOP_TIME = this.NUM_BEATS * this.SECONDS_PER_BEAT;
 
-let sound = null;
-function sound_init_callback(s) {
-    sound = s;
-    console.log(s);
-} 
+        this.NUM_SYNTHS = 3;
 
-let NUM_SYNTHS = 3;
+        this.kickSequence = new Array(this.NUM_BEATS).fill(false);
+        this.kickSequence[0] = this.kickSequence[4] = this.kickSequence[8] = this.kickSequence[12] = true;
 
-const bounds = {
-    min: { x: 0.0, y: 0.0 },
-    max: { x: canvas.width, y: canvas.height }
-};
-const playerSpeed = canvas.width / 2.5;
-const playerSize = canvas.width / 20.0;
-let playerPos = {
-    x: 0.5 * (bounds.min.x + bounds.max.x),
-    y: 0.5 * (bounds.min.y + bounds.max.y)
-}
-let playerHeading = 0.0;
+        this.sequences = new Array(this.NUM_SYNTHS);
+        for (let i = 0; i < this.NUM_SYNTHS; ++i) {
+            this.sequences[i] = new Array(this.NUM_BEATS).fill({
+                note: -1,
+                sustain: false
+            });
+        }
 
-let movementDir = { x: 0, y: 0 };
-let prevTimeMillis = -1.0;
+        this.loopElapsedTime = 0.0;
+        this.currentBeatIx = -1;
 
-let slashPressed = false;
-let scanning = false;
-let sustaining = false;
+        this.enemySize = this.canvas.width / 20.0;
+        this.enemies = generateRandomEnemies(this.NUM_BEATS, 10, b);
 
-const BPM = 4 * 120.0;
-const SECONDS_PER_BEAT = 60.0 / BPM;
-const NUM_BEATS = 16;
-const LOOP_TIME = NUM_BEATS * SECONDS_PER_BEAT;
-let kickSequence = new Array(NUM_BEATS).fill(false);
-kickSequence[0] = kickSequence[4] = kickSequence[8] = kickSequence[12] = true;
-let sequences = new Array(NUM_SYNTHS);
-for (let i = 0; i < NUM_SYNTHS; ++i) {
-    sequences[i] = new Array(NUM_BEATS).fill({
-        note: -1,
-        sustain: false
-    });
-}
-let loopElapsedTime = 0.0;
-let currentBeatIx = -1;
+        this.controlDir = { x: 0.0, y: 0.0 };
+        this.slashPressed = false;
+        this.sustaining = false;
+        this.scanning = false;
 
-const enemySize = canvas.width / 20.0;
-let enemies = generateRandomEnemies(NUM_BEATS, 10, bounds);
+        this.prevTimeMillis = -1.0;
 
-// EVENT HANDLING
-function onKeyDown(event) {
-    if (event.repeat) {
-        return;
+        // TEST
+        let tileSetWidthTiles = 30;
+        let tileSetHeightTiles = 32;
+        let desiredPxPerTile = 100.0;
+        this.tileSetCanvas = new OffscreenCanvas(tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
+        this.tileSetCanvasCtx = this.tileSetCanvas.getContext('2d');
+        this.tileSetCanvasCtx.mozImageSmoothingEnabled = false;
+        this.tileSetCanvasCtx.webkitImageSmoothingEnabled = false;
+        this.tileSetCanvasCtx.msImageSmoothingEnabled = false;
+        this.tileSetCanvasCtx.imageSmoothingEnabled = false;
+        this.tileSetCanvasCtx.drawImage(event.target, 0, 0, tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
+        
+        window.addEventListener('keydown', (e) => this.onKeyDown(e));
+        window.addEventListener('keyup', (e) => this.onKeyUp(e));
     }
-    switch (event.key) {
-        case "w": movementDir.y -= 1.0; break;
-        case "s": movementDir.y += 1.0; break;
-        case "a": movementDir.x -= 1.0; break;
-        case "d": movementDir.x += 1.0; break;
-        case "j": slashPressed = true; break;
-        case "k": scanning = true; break;
-        case "l": sustaining = true; break;
+    bounds() {
+        return {
+            min: { x: 0.0, y: 0.0 },
+            max: { x: canvas.width, y: canvas.height }
+        }
     }
-}
-
-function onKeyUp(event) {
-    if (event.repeat) {
-        return;
+    onKeyDown(event) {
+        if (event.repeat) {
+            return;
+        }
+        switch (event.key) {
+            case "w": this.controlDir.y -= 1.0; break;
+            case "s": this.controlDir.y += 1.0; break;
+            case "a": this.controlDir.x -= 1.0; break;
+            case "d": this.controlDir.x += 1.0; break;
+            case "j": this.slashPressed = true; break;
+            case "k": this.scanning = true; break;
+            case "l": this.sustaining = true; break;
+        }
     }
-    switch (event.key) {
-        case "w": movementDir.y += 1.0; break;
-        case "s": movementDir.y -= 1.0; break;
-        case "a": movementDir.x += 1.0; break;
-        case "d": movementDir.x -= 1.0; break;
-        case "k": scanning = false; break;
-        case "l": sustaining = false; break;
+    onKeyUp(event) {
+        switch (event.key) {
+            case "w": this.controlDir.y += 1.0; break;
+            case "s": this.controlDir.y -= 1.0; break;
+            case "a": this.controlDir.x += 1.0; break;
+            case "d": this.controlDir.x -= 1.0; break;
+            case "k": this.scanning = false; break;
+            case "l": this.sustaining = false; break;
+        }
     }
 }
 
@@ -445,77 +171,63 @@ function drawSequence(canvasCtx, numBeats, currentBeatIx, canvasWidth, canvasHei
     }
 }
 
-// UPDATE LOOP
-function update(timeMillis) {
-    if (prevTimeMillis < 0) {
-        prevTimeMillis = timeMillis;
-        window.requestAnimationFrame(update);
-        return;
+function update(g, timeMillis) {
+    if (g.prevTimeMillis < 0.0) {
+        g.prevTimeMillis = timeMillis;
     }
-    if (!g_initialized) {
-        if (g_initKeyPressed && sound !== null && g_imagesLoaded) {
-            g_initialized = true;
-        } else {
-            canvasCtx.font = '48px serif';
-            canvasCtx.fillText('Please press the space bar to start', 10, 50);
-            window.requestAnimationFrame(update);
-            return;
-        }
-    }
+    let dt = (timeMillis - g.prevTimeMillis) * 0.001;
+    g.prevTimeMillis = timeMillis;
 
-    let dt = (timeMillis - prevTimeMillis) * 0.001;
-    prevTimeMillis = timeMillis;
-
-    loopElapsedTime += dt;
-    if (loopElapsedTime >= LOOP_TIME) {
+    g.loopElapsedTime += dt;
+    if (g.loopElapsedTime >= g.LOOP_TIME) {
         // TODO: Can this cause inaccuracies/drift?
-        loopElapsedTime = 0.0;
+        g.loopElapsedTime = 0.0;
     }
 
     let newBeat = false;
     {
-        let newBeatIx = Math.floor((loopElapsedTime / LOOP_TIME) * NUM_BEATS);
-        console.assert(newBeatIx < NUM_BEATS);
-        if (newBeatIx !== currentBeatIx) {
+        let newBeatIx = Math.floor((g.loopElapsedTime / g.LOOP_TIME) * g.NUM_BEATS);
+        console.assert(newBeatIx < g.NUM_BEATS);
+        if (newBeatIx !== g.currentBeatIx) {
             newBeat = true;
-            currentBeatIx = newBeatIx;
+            g.currentBeatIx = newBeatIx;
         }
     }
 
     let hitBox = null;
     let enemyHitBoxes = [];
-    if (slashPressed || sustaining) {
+    if (g.slashPressed || g.sustaining) {
         let headingVec = {
-            x: Math.cos(playerHeading),
-            y: Math.sin(playerHeading)
+            x: Math.cos(g.playerHeading),
+            y: Math.sin(g.playerHeading)
         };
         let leftVec = rotate90Ccw(headingVec);
-        let front = scale(headingVec, 0.5*playerSize + playerSize);
-        let back = scale(headingVec, 0.5*playerSize);
-        let left = scale(leftVec, playerSize);
-        let right = scale(left, -1.0);
-        let frontLeft = add(playerPos, add(front, left));
-        let backLeft = add(playerPos, add(back, left));
-        let backRight = add(playerPos, add(back, right));
-        let frontRight = add(playerPos, add(front, right));
+        let front = vecScale(headingVec, 0.5*g.playerSize + g.playerSize);
+        let back = vecScale(headingVec, 0.5*g.playerSize);
+        let left = vecScale(leftVec, g.playerSize);
+        let right = vecScale(left, -1.0);
+        let frontLeft = vecAdd(g.playerPos, vecAdd(front, left));
+        let backLeft = vecAdd(g.playerPos, vecAdd(back, left));
+        let backRight = vecAdd(g.playerPos, vecAdd(back, right));
+        let frontRight = vecAdd(g.playerPos, vecAdd(front, right));
         hitBox = [frontLeft, backLeft, backRight, frontRight];
 
-        for (let i = 0; i < enemies.length; ++i) {
-            let e = enemies[i];
-            let s = 0.5*enemySize;
+        for (let i = 0; i < g.enemies.length; ++i) {
+            let e = g.enemies[i];
+            let s = 0.5*g.enemySize;
             let enemyHitBox = [
-                add(e.pos, { x: -s, y: s }),
-                add(e.pos, { x: -s, y: -s }),
-                add(e.pos, { x: s, y: -s }),
-                add(e.pos, { x: s, y: s })
+                vecAdd(e.pos, { x: -s, y: s }),
+                vecAdd(e.pos, { x: -s, y: -s }),
+                vecAdd(e.pos, { x: s, y: -s }),
+                vecAdd(e.pos, { x: s, y: s })
             ];
             enemyHitBoxes.push(enemyHitBox);
             if (!e.alive) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[currentBeatIx].note >= 0) {
-                let hitIx = (currentBeatIx + 1) % NUM_BEATS;
-                sequences[e.synth_ix][hitIx] = e.seq[currentBeatIx];
+            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[g.currentBeatIx].note >= 0) {
+                let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
+                g.sequences[e.synth_ix][hitIx] = e.seq[g.currentBeatIx];
                 if (e.synth_ix !== 2) {
                     e.alive = false;
                 }
@@ -524,15 +236,15 @@ function update(timeMillis) {
     }
 
     // Find nearest enemy (of each type)
-    let nearestEnemies = new Array(NUM_SYNTHS).fill(-1);
-    let nearestDists = new Array(NUM_SYNTHS).fill(-1);
-    if (scanning) {
-        for (let i = 0; i < enemies.length; ++i) {
-            let e = enemies[i];
+    let nearestEnemies = new Array(g.NUM_SYNTHS).fill(-1);
+    let nearestDists = new Array(g.NUM_SYNTHS).fill(-1);
+    if (g.scanning) {
+        for (let i = 0; i < g.enemies.length; ++i) {
+            let e = g.enemies[i];
             if (!e.alive) {
                 continue;
             }
-            let d = norm(add(e.pos, scale(playerPos, -1.0)));
+            let d = vecNorm(vecAdd(e.pos, vecScale(g.playerPos, -1.0)));
             if (nearestEnemies[e.synth_ix] == -1 ||
                 d < nearestDists[e.synth_ix]) {
                 nearestEnemies[e.synth_ix] = i;
@@ -541,89 +253,89 @@ function update(timeMillis) {
         }
     }
 
-    if (sound !== null && newBeat) {
-        console.assert(sound.synths.length == NUM_SYNTHS, sound.synths.length);
-        for (let i = 0; i < NUM_SYNTHS; ++i) {
-            if (sequences[i][currentBeatIx].note >= 0) {
+    if (newBeat) {
+        for (let i = 0; i < g.NUM_SYNTHS; ++i) {
+            if (g.sequences[i][g.currentBeatIx].note >= 0) {
                 synthPlayVoice(
-                    sound.synths[i], 0, sequences[i][currentBeatIx].note,
-                    sequences[i][currentBeatIx].sustain, sound.audioCtx);
+                    g.sound.synths[i], 0, g.sequences[i][g.currentBeatIx].note,
+                    g.sequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
             } else {
-                synthReleaseVoice(sound.synths[i], 0, sound.audioCtx);
+                synthReleaseVoice(g.sound.synths[i], 0, g.sound.audioCtx);
             }
 
             if (nearestEnemies[i] >= 0) {
-                let e = enemies[nearestEnemies[i]];
-                if (e.seq[currentBeatIx].note >= 0) {
+                let e = g.enemies[nearestEnemies[i]];
+                if (e.seq[g.currentBeatIx].note >= 0) {
                     synthPlayVoice(
-                        sound.auxSynths[i], 0, e.seq[currentBeatIx].note,
-                        e.seq[currentBeatIx].sustain, sound.audioCtx);
+                        g.sound.auxSynths[i], 0, e.seq[g.currentBeatIx].note,
+                        e.seq[g.currentBeatIx].sustain, g.sound.audioCtx);
                 } else {
-                    synthReleaseVoice(sound.auxSynths[i], 0, sound.audioCtx);
+                    synthReleaseVoice(g.sound.auxSynths[i], 0, g.sound.audioCtx);
                 }
             } else {
-                synthReleaseVoice(sound.auxSynths[i], 0, sound.audioCtx);
+                synthReleaseVoice(g.sound.auxSynths[i], 0, g.sound.audioCtx);
             }
         }
-        if (kickSequence[currentBeatIx]) {
-            playSoundFromBuffer(sound.audioCtx, sound.drumSounds[0]);
+        if (g.kickSequence[g.currentBeatIx]) {
+            playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[0]);
         }
     }
-    
-    if (movementDir.x !== 0 || movementDir.y !== 0) {
-        playerPos = add(playerPos, scale(normalized(movementDir), playerSpeed * dt));
-        playerPos.x = Math.max(Math.min(playerPos.x, bounds.max.x), bounds.min.x);
-        playerPos.y = Math.max(Math.min(playerPos.y, bounds.max.y), bounds.min.y);
-        playerHeading = Math.atan2(movementDir.y, movementDir.x);
+
+    let bounds = g.bounds();
+    if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
+        g.playerPos = vecAdd(
+            g.playerPos, vecScale(vecNormalized(g.controlDir), g.playerSpeed * dt));
+        g.playerPos.x = Math.max(Math.min(g.playerPos.x, bounds.max.x), bounds.min.x);
+        g.playerPos.y = Math.max(Math.min(g.playerPos.y, bounds.max.y), bounds.min.y);
+        g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
     }
 
-    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-    // Fill bg
-    canvasCtx.fillStyle = 'grey';
-    canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-    
+    g.canvasCtx.fillStyle = 'grey';
+    g.canvasCtx.fillRect(0, 0, g.canvas.width, g.canvas.height);
+
     // TEST
+    let tiles = [32, 34, 34, 34, 34, 33, 34, 35, 62, 64, 65, 64, 62, 63, 65, 64, 122, 129, 130, 131, 129, 131, 131, 180, 151, 184, 183, 184, 182, 185, 189, 135, 151, 183, 183, 188, 183, 184, 185, 136, 151, 183, 183, 185, 183, 186, 185, 135];
     for (let i = 0; i < 8; ++i) {
         for (let j = 0; j < 6; ++j) {
-            let tileIdx = g_tiles[j*8 + i] - 1;
+            let tileIdx = tiles[j*8 + i] - 1;
             let tile_j = Math.floor(tileIdx / 30);
             let tile_i = tileIdx % 30;
-            canvasCtx.drawImage(tileSetCanvas, tile_i * 100, tile_j * 100, 100, 100, i*100, j*100, 100, 100);
+            g.canvasCtx.drawImage(g.tileSetCanvas, tile_i * 100, tile_j * 100, 100, 100, i*100, j*100, 100, 100);
         }
     }
 
     // Draw Player
-    canvasCtx.save();
-    canvasCtx.fillStyle = 'red';
-    canvasCtx.translate(playerPos.x, playerPos.y);
-    canvasCtx.rotate(playerHeading);
-    canvasCtx.translate(-playerPos.x, -playerPos.y);
-    canvasCtx.fillRect(playerPos.x - 0.5*playerSize,
-                       playerPos.y - 0.5*playerSize,
-                       playerSize, playerSize);
-    canvasCtx.translate(playerPos.x, playerPos.y);
-    const EYE_SIZE = 0.25*playerSize;
-    canvasCtx.fillStyle = 'black';
-    canvasCtx.fillRect(0.5*playerSize - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
-    canvasCtx.restore();
+    g.canvasCtx.save();
+    g.canvasCtx.fillStyle = 'red';
+    g.canvasCtx.translate(g.playerPos.x, g.playerPos.y);
+    g.canvasCtx.rotate(g.playerHeading);
+    g.canvasCtx.translate(-g.playerPos.x, -g.playerPos.y);
+    g.canvasCtx.fillRect(g.playerPos.x - 0.5*g.playerSize,
+                            g.playerPos.y - 0.5*g.playerSize,
+                            g.playerSize, g.playerSize);
+    g.canvasCtx.translate(g.playerPos.x, g.playerPos.y);
+    const EYE_SIZE = 0.25*g.playerSize;
+    g.canvasCtx.fillStyle = 'black';
+    g.canvasCtx.fillRect(0.5*g.playerSize - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
+    g.canvasCtx.restore();
 
     // Draw Enemies
-    canvasCtx.strokeStyle = 'white';
-    for (i = 0; i < enemies.length; ++i) {
-        let e = enemies[i];
+    g.canvasCtx.strokeStyle = 'white';
+    for (i = 0; i < g.enemies.length; ++i) {
+        let e = g.enemies[i];
         if (!e.alive) {
             continue;
         }
-        canvasCtx.fillStyle = e.color;
-        canvasCtx.fillRect(e.pos.x - 0.5*enemySize,
-                           e.pos.y - 0.5*enemySize,
-                           enemySize, enemySize);
-        if (e.seq[currentBeatIx] < 0) {
+        g.canvasCtx.fillStyle = e.color;
+        g.canvasCtx.fillRect(e.pos.x - 0.5*g.enemySize,
+                                e.pos.y - 0.5*g.enemySize,
+                                g.enemySize, g.enemySize);
+        if (e.seq[g.currentBeatIx] < 0) {
             // draw a barrier
-            canvasCtx.strokeRect(
-                e.pos.x - 0.6*enemySize,
-                e.pos.y - 0.6*enemySize,
-                1.2*enemySize, 1.2*enemySize);
+            g.canvasCtx.strokeRect(
+                e.pos.x - 0.6*g.enemySize,
+                e.pos.y - 0.6*g.enemySize,
+                1.2*g.enemySize, 1.2*g.enemySize);
         }
         let isAClosestEnemy = false;
         for (let j = 0; j < nearestEnemies.length; ++j) {
@@ -632,75 +344,69 @@ function update(timeMillis) {
             }
         }
         if (isAClosestEnemy) {
-            canvasCtx.fillStyle = 'black';
-            canvasCtx.fillRect(
-                e.pos.x - 0.05*enemySize,
-                e.pos.y - 0.05*enemySize,
-                0.1*enemySize, 0.1*enemySize);
+            g.canvasCtx.fillStyle = 'black';
+            g.canvasCtx.fillRect(
+                e.pos.x - 0.05*g.enemySize,
+                e.pos.y - 0.05*g.enemySize,
+                0.1*g.enemySize, 0.1*g.enemySize);
         }
-        if (slashPressed) {
+        if (g.slashPressed) {
             let hb = enemyHitBoxes[i];
-            canvasCtx.beginPath();
-            canvasCtx.moveTo(hb[hb.length - 1].x, hb[hb.length - 1].y);
+            g.canvasCtx.beginPath();
+            g.canvasCtx.moveTo(hb[hb.length - 1].x, hb[hb.length - 1].y);
             for (let i = 0; i < hb.length; ++i) {
-                canvasCtx.lineTo(hb[i].x, hb[i].y);
+                g.canvasCtx.lineTo(hb[i].x, hb[i].y);
             }
-            canvasCtx.stroke();
+            g.canvasCtx.stroke();
         }
     }
 
     // Draw slash
-    if (slashPressed) {
-        canvas.strokeStyle = 'black';
+    if (g.slashPressed) {
+        g.canvas.strokeStyle = 'black';
         console.assert(hitBox !== null);
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(hitBox[hitBox.length - 1].x, hitBox[hitBox.length - 1].y);
+        g.canvasCtx.beginPath();
+        g.canvasCtx.moveTo(hitBox[hitBox.length - 1].x, hitBox[hitBox.length - 1].y);
         for (let i = 0; i < hitBox.length; ++i) {
-            canvasCtx.lineTo(hitBox[i].x, hitBox[i].y);
+            g.canvasCtx.lineTo(hitBox[i].x, hitBox[i].y);
         }
-        canvasCtx.stroke();
+        g.canvasCtx.stroke();
     }
 
-    drawSequence(canvasCtx, NUM_BEATS, currentBeatIx, canvas.width, canvas.height);
+    drawSequence(g.canvasCtx, g.NUM_BEATS, g.currentBeatIx, g.canvas.width, g.canvas.height);
 
-    slashPressed = false;
-    window.requestAnimationFrame(update);
+    g.slashPressed = false;
+
+    window.requestAnimationFrame((t) => update(g, t));
 }
 
-function initKeyCallback(event) {
-    if (event.repeat) {
-        return;
-    }
-    if (event.key == ' ') {
-        initSound(NUM_SYNTHS).then(sound_init_callback);
-        g_initKeyPressed = true;
-        window.removeEventListener("keydown", initKeyCallback);
-    }
-}
-window.addEventListener("keydown", initKeyCallback);
+async function main() {
+    // Wait for user to press a key
+    let msg = document.getElementById('message');
+    // TODO: figure out how to make this work with a specific key (like Space).
+    msg.innerHTML = 'Please press Spacebar.';
+    const waitForAnyKey = () =>
+        new Promise((resolve) => {
+            window.addEventListener('keydown', () => resolve(), {once: true});
+        });
+    await waitForAnyKey();
+    msg.innerHTML = '';
 
-function onImgLoaded(event) {
-    let tileSetWidthTiles = 30;
-    let tileSetHeightTiles = 32;
-    let desiredPxPerTile = 100.0;
-    tileSetCanvas = new OffscreenCanvas(tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
-    tileSetCanvasCtx = tileSetCanvas.getContext('2d');
-    tileSetCanvasCtx.mozImageSmoothingEnabled = false;
-    tileSetCanvasCtx.webkitImageSmoothingEnabled = false;
-    tileSetCanvasCtx.msImageSmoothingEnabled = false;
-    tileSetCanvasCtx.imageSmoothingEnabled = false;
-    tileSetCanvasCtx.drawImage(event.target, 0, 0, tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
-    g_imagesLoaded = true;
-}
+    let sound = await initSound();
 
-function loadImages() {
     let tileSetImg = new Image();
-    tileSetImg.addEventListener('load', onImgLoaded);
+    const waitForImgLoad = () =>
+        new Promise((resolve) => {
+            tileSetImg.addEventListener('load', () => resolve(), {once: true});
+        });
     tileSetImg.src = 'tiles/dungeon tileset calciumtrice simple.png';
+    await waitForImgLoad();
+
+    let canvas = document.getElementById('canvas');
+    
+    let gameState = new GameState(canvas, sound, tileSetImg);
+
+    window.requestAnimationFrame((t) => update(gameState, t));
 }
 
-loadImages();
-
-window.addEventListener("keydown", onKeyDown);
-window.addEventListener("keyup", onKeyUp);
-window.requestAnimationFrame(update);
+main();
