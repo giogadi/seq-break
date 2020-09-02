@@ -66,8 +66,12 @@ class GameState {
         this.canvasCtx = canvas.getContext('2d');
         this.sound = sound;
 
-        this.playerSpeed = canvas.width / 2.5;
-        this.playerSize = canvas.width  / 20.0;
+        this.pixelsPerUnit = 100;
+        this.widthInUnits = this.canvas.width / this.pixelsPerUnit;
+        this.heightInUnits = this.canvas.height / this.pixelsPerUnit;
+
+        this.playerSpeed = this.widthInUnits / 2.5;
+        this.playerSize = this.widthInUnits / 20.0;
         let b = this.bounds();
         this.playerPos = vecScale(vecAdd(b.min, b.max), 0.5);
         this.playerHeading = 0.0;
@@ -93,7 +97,7 @@ class GameState {
         this.loopElapsedTime = 0.0;
         this.currentBeatIx = -1;
 
-        this.enemySize = this.canvas.width / 20.0;
+        this.enemySize = this.widthInUnits / 20.0;
         this.enemies = generateRandomEnemies(this.NUM_BEATS, 10, b);
 
         this.controlDir = { x: 0.0, y: 0.0 };
@@ -121,7 +125,7 @@ class GameState {
     bounds() {
         return {
             min: { x: 0.0, y: 0.0 },
-            max: { x: canvas.width, y: canvas.height }
+            max: { x: this.widthInUnits, y: this.heightInUnits }
         }
     }
     onKeyDown(event) {
@@ -304,19 +308,24 @@ function update(g, timeMillis) {
         }
     }
 
+    // TODO for all drawing code: try to make all the pixel values integers to avoid the subpixel stuff 
+    // javascript does.
+
     // Draw Player
+    let playerPosPx = vecScale(g.playerPos, g.pixelsPerUnit);
+    let playerSizePx = g.playerSize * g.pixelsPerUnit;
     g.canvasCtx.save();
     g.canvasCtx.fillStyle = 'red';
-    g.canvasCtx.translate(g.playerPos.x, g.playerPos.y);
+    g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
     g.canvasCtx.rotate(g.playerHeading);
-    g.canvasCtx.translate(-g.playerPos.x, -g.playerPos.y);
-    g.canvasCtx.fillRect(g.playerPos.x - 0.5*g.playerSize,
-                            g.playerPos.y - 0.5*g.playerSize,
-                            g.playerSize, g.playerSize);
-    g.canvasCtx.translate(g.playerPos.x, g.playerPos.y);
-    const EYE_SIZE = 0.25*g.playerSize;
+    g.canvasCtx.translate(-playerPosPx.x, -playerPosPx.y);
+    g.canvasCtx.fillRect(playerPosPx.x - 0.5*playerSizePx,
+                         playerPosPx.y - 0.5*playerSizePx,
+                         playerSizePx, playerSizePx);
+    g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
+    const EYE_SIZE = 0.25*playerSizePx;
     g.canvasCtx.fillStyle = 'black';
-    g.canvasCtx.fillRect(0.5*g.playerSize - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
+    g.canvasCtx.fillRect(0.5*playerSizePx - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
     g.canvasCtx.restore();
 
     // Draw Enemies
@@ -326,16 +335,19 @@ function update(g, timeMillis) {
         if (!e.alive) {
             continue;
         }
+        let posPx = vecScale(e.pos, g.pixelsPerUnit);
+        let sizePx = g.enemySize * g.pixelsPerUnit;
         g.canvasCtx.fillStyle = e.color;
-        g.canvasCtx.fillRect(e.pos.x - 0.5*g.enemySize,
-                                e.pos.y - 0.5*g.enemySize,
-                                g.enemySize, g.enemySize);
+        g.canvasCtx.fillRect(
+            posPx.x - 0.5*sizePx,
+            posPx.y - 0.5*sizePx,
+            sizePx, sizePx);
         if (e.seq[g.currentBeatIx] < 0) {
             // draw a barrier
             g.canvasCtx.strokeRect(
-                e.pos.x - 0.6*g.enemySize,
-                e.pos.y - 0.6*g.enemySize,
-                1.2*g.enemySize, 1.2*g.enemySize);
+                posPx.x - 0.6*sizePx,
+                posPx.y - 0.6*sizePx,
+                1.2*sizePx, 1.2*sizePx);
         }
         let isAClosestEnemy = false;
         for (let j = 0; j < nearestEnemies.length; ++j) {
@@ -346,16 +358,20 @@ function update(g, timeMillis) {
         if (isAClosestEnemy) {
             g.canvasCtx.fillStyle = 'black';
             g.canvasCtx.fillRect(
-                e.pos.x - 0.05*g.enemySize,
-                e.pos.y - 0.05*g.enemySize,
-                0.1*g.enemySize, 0.1*g.enemySize);
+                posPx.x - 0.05*sizePx,
+                posPx.y - 0.05*sizePx,
+                0.1*sizePx, 0.1*sizePx);
         }
         if (g.slashPressed) {
             let hb = enemyHitBoxes[i];
+            let hbPx = [];
+            for (let j = 0; j < hb.length; ++j) {
+                hbPx.push(vecScale(hb[j], g.pixelsPerUnit));
+            }
             g.canvasCtx.beginPath();
-            g.canvasCtx.moveTo(hb[hb.length - 1].x, hb[hb.length - 1].y);
-            for (let i = 0; i < hb.length; ++i) {
-                g.canvasCtx.lineTo(hb[i].x, hb[i].y);
+            g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
+            for (let j = 0; j < hbPx.length; ++j) {
+                g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
             }
             g.canvasCtx.stroke();
         }
@@ -365,10 +381,14 @@ function update(g, timeMillis) {
     if (g.slashPressed) {
         g.canvas.strokeStyle = 'black';
         console.assert(hitBox !== null);
+        let hbPx = [];
+        for (let j = 0; j < hitBox.length; ++j) {
+            hbPx.push(vecScale(hitBox[j], g.pixelsPerUnit));
+        }
         g.canvasCtx.beginPath();
-        g.canvasCtx.moveTo(hitBox[hitBox.length - 1].x, hitBox[hitBox.length - 1].y);
-        for (let i = 0; i < hitBox.length; ++i) {
-            g.canvasCtx.lineTo(hitBox[i].x, hitBox[i].y);
+        g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
+        for (let j = 0; j < hbPx.length; ++j) {
+            g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
         }
         g.canvasCtx.stroke();
     }
