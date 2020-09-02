@@ -61,12 +61,12 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
 }
 
 class GameState {
-    constructor(canvas, sound, tileSetImg) {
+    constructor(canvas, sound, tileSet, pixelsPerUnit) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.sound = sound;
 
-        this.pixelsPerUnit = 100;
+        this.pixelsPerUnit = pixelsPerUnit;
         this.widthInUnits = this.canvas.width / this.pixelsPerUnit;
         this.heightInUnits = this.canvas.height / this.pixelsPerUnit;
 
@@ -107,17 +107,7 @@ class GameState {
 
         this.prevTimeMillis = -1.0;
 
-        // TEST
-        let tileSetWidthTiles = 30;
-        let tileSetHeightTiles = 32;
-        let desiredPxPerTile = 100.0;
-        this.tileSetCanvas = new OffscreenCanvas(tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
-        this.tileSetCanvasCtx = this.tileSetCanvas.getContext('2d');
-        this.tileSetCanvasCtx.mozImageSmoothingEnabled = false;
-        this.tileSetCanvasCtx.webkitImageSmoothingEnabled = false;
-        this.tileSetCanvasCtx.msImageSmoothingEnabled = false;
-        this.tileSetCanvasCtx.imageSmoothingEnabled = false;
-        this.tileSetCanvasCtx.drawImage(event.target, 0, 0, tileSetWidthTiles * desiredPxPerTile, tileSetHeightTiles * desiredPxPerTile);
+        this.tileSet = tileSet;
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -125,7 +115,8 @@ class GameState {
     bounds() {
         return {
             min: { x: 0.0, y: 0.0 },
-            max: { x: this.widthInUnits, y: this.heightInUnits }
+            //max: { x: this.widthInUnits, y: this.heightInUnits }
+            max: { x: TWO_AREAS_MAP.columns, y: TWO_AREAS_MAP.rows }
         }
     }
     onKeyDown(event) {
@@ -295,16 +286,26 @@ function update(g, timeMillis) {
     }
 
     g.canvasCtx.fillStyle = 'grey';
-    g.canvasCtx.fillRect(0, 0, g.canvas.width, g.canvas.height);
+    g.canvasCtx.fillRect(0, 0, g.canvas.width, g.canvas.height);    
 
-    // TEST
-    let tiles = [32, 34, 34, 34, 34, 33, 34, 35, 62, 64, 65, 64, 62, 63, 65, 64, 122, 129, 130, 131, 129, 131, 131, 180, 151, 184, 183, 184, 182, 185, 189, 135, 151, 183, 183, 188, 183, 184, 185, 136, 151, 183, 183, 185, 183, 186, 185, 135];
-    for (let i = 0; i < 8; ++i) {
-        for (let j = 0; j < 6; ++j) {
-            let tileIdx = tiles[j*8 + i] - 1;
-            let tile_j = Math.floor(tileIdx / 30);
-            let tile_i = tileIdx % 30;
-            g.canvasCtx.drawImage(g.tileSetCanvas, tile_i * 100, tile_j * 100, 100, 100, i*100, j*100, 100, 100);
+    // View transform
+    g.canvasCtx.save();
+    let centerPosPx = { x: Math.floor(0.5 * g.canvas.width), y: Math.floor(0.5 * g.canvas.height) };
+    let cameraPx = { x: Math.floor(g.playerPos.x * g.pixelsPerUnit), y: Math.floor(g.playerPos.y * g.pixelsPerUnit) };
+    let centerToCamera = vecAdd(cameraPx, vecScale(centerPosPx, -1.0));
+    console.log(centerToCamera);
+    g.canvasCtx.translate(-centerToCamera.x, -centerToCamera.y);
+
+    // Draw map.
+    let ppt = g.tileSet.ppt;
+    let tileMap = TWO_AREAS_MAP;
+    for (let col = 0; col < tileMap.columns; ++col) {
+        for (let row = 0; row < tileMap.rows; ++row) {
+            let tileIdx = tileMap.data[row*tileMap.columns + col] - 1;
+            let tile_j = Math.floor(tileIdx / g.tileSet.info.columns);
+            let tile_i = tileIdx % g.tileSet.info.columns;
+            // TODO: is this call doing scaling? Scaling is costly and we want to avoid it if possible.
+            g.canvasCtx.drawImage(g.tileSet.canvas, tile_i * ppt, tile_j * ppt, ppt, ppt, col*ppt, row*ppt, ppt, ppt);
         }
     }
 
@@ -397,6 +398,8 @@ function update(g, timeMillis) {
 
     g.slashPressed = false;
 
+    g.canvasCtx.restore();
+
     window.requestAnimationFrame((t) => update(g, t));
 }
 
@@ -413,18 +416,14 @@ async function main() {
     msg.innerHTML = '';
 
     let sound = await initSound();
+    
+    let pixelsPerUnit = 50;
 
-    let tileSetImg = new Image();
-    const waitForImgLoad = () =>
-        new Promise((resolve) => {
-            tileSetImg.addEventListener('load', () => resolve(), {once: true});
-        });
-    tileSetImg.src = 'tiles/dungeon tileset calciumtrice simple.png';
-    await waitForImgLoad();
+    let tileSet = await loadTileSet(SIMPLE_DUNGEON_TILE_SET_INFO, pixelsPerUnit);
 
     let canvas = document.getElementById('canvas');
     
-    let gameState = new GameState(canvas, sound, tileSetImg);
+    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit);
 
     window.requestAnimationFrame((t) => update(gameState, t));
 }
