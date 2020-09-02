@@ -276,12 +276,32 @@ function update(g, timeMillis) {
         }
     }
 
+    let tileMap = TWO_AREAS_MAP;
     let bounds = g.bounds();
     if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
-        g.playerPos = vecAdd(
+        let oldPos = g.playerPos;
+        let newPos = vecAdd(
             g.playerPos, vecScale(vecNormalized(g.controlDir), g.playerSpeed * dt));
-        g.playerPos.x = Math.max(Math.min(g.playerPos.x, bounds.max.x), bounds.min.x);
-        g.playerPos.y = Math.max(Math.min(g.playerPos.y, bounds.max.y), bounds.min.y);
+        let minTileOverlap = {
+            x: Math.max(0, Math.floor(newPos.x - 0.5*g.playerSize)),
+            y: Math.max(0, Math.floor(newPos.y - 0.5*g.playerSize))
+        };
+        let maxTileOverlap = {
+            x: Math.min(tileMap.columns-1, Math.floor(newPos.x + 0.5*g.playerSize)),
+            y: Math.min(tileMap.rows-1, Math.floor(newPos.y + 0.5*g.playerSize))
+        };
+        let collided = false;
+        for (let col = minTileOverlap.x; col <= maxTileOverlap.x && !collided; ++col) {
+            for (let row = minTileOverlap.y; row <= maxTileOverlap.y && !collided; ++row) {
+                let tileSetIdx = tileMap.data[row*tileMap.columns + col] - 1;
+                if (g.tileSet.collisions[tileSetIdx]) {
+                    collided = true;
+                }
+            }
+        }
+        if (!collided) {
+            g.playerPos = newPos;
+        }
         g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
     }
 
@@ -293,12 +313,10 @@ function update(g, timeMillis) {
     let centerPosPx = { x: Math.floor(0.5 * g.canvas.width), y: Math.floor(0.5 * g.canvas.height) };
     let cameraPx = { x: Math.floor(g.playerPos.x * g.pixelsPerUnit), y: Math.floor(g.playerPos.y * g.pixelsPerUnit) };
     let centerToCamera = vecAdd(cameraPx, vecScale(centerPosPx, -1.0));
-    console.log(centerToCamera);
     g.canvasCtx.translate(-centerToCamera.x, -centerToCamera.y);
 
     // Draw map.
     let ppt = g.tileSet.ppt;
-    let tileMap = TWO_AREAS_MAP;
     for (let col = 0; col < tileMap.columns; ++col) {
         for (let row = 0; row < tileMap.rows; ++row) {
             let tileIdx = tileMap.data[row*tileMap.columns + col] - 1;
@@ -394,11 +412,11 @@ function update(g, timeMillis) {
         g.canvasCtx.stroke();
     }
 
+    g.canvasCtx.restore();
+
     drawSequence(g.canvasCtx, g.NUM_BEATS, g.currentBeatIx, g.canvas.width, g.canvas.height);
 
     g.slashPressed = false;
-
-    g.canvasCtx.restore();
 
     window.requestAnimationFrame((t) => update(g, t));
 }
