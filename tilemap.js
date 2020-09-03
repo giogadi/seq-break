@@ -1,373 +1,29 @@
-let DUNGEON_TILE_SET_INFO = { "columns":30,
-"image":"tiles/dungeon tileset calciumtrice simple.png",
-"imageheight":512,
-"imagewidth":480,
-"margin":0,
-"name":"dungeon",
-"spacing":0,
-"tilecount":960,
-"tiledversion":"1.4.2",
-"tileheight":16,
-"tilewidth":16,
-"type":"tileset",
-"version":1.4
-};
+function getJsonData(filename) {
+    return new Promise(function(resolve, reject) {
+        let request = new XMLHttpRequest();
+        request.open(
+            'GET', 'http://' + window.location.hostname + ":80/" + filename);
+        request.responseType = 'json';
+        request.onload = function() {
+            resolve(request.response);
+        }
+        request.onerror = function() {
+            reject(request.statusText);
+        }
+        request.send();
+    });
+}
 
-let SIMPLE_DUNGEON_TILE_SET_INFO = { "columns":19,
-"editorsettings":
-   {
-    "export":
-       {
-        "format":"json",
-        "target":"dungeon_simple.json"
-       }
-   },
-"image":"tiles/sheet.png",
-"imageheight":208,
-"imagewidth":304,
-"margin":0,
-"name":"dungeon_simple",
-"spacing":0,
-"tilecount":247,
-"tiledversion":"1.4.2",
-"tileheight":16,
-"tiles":[
-       {
-        "id":0,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":1,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":2,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":2,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":3,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":4,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":19,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":21,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":22,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":23,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":38,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":39,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }, 
-       {
-        "id":40,
-        "objectgroup":
-           {
-            "draworder":"index",
-            "id":2,
-            "name":"",
-            "objects":[
-                   {
-                    "height":16,
-                    "id":1,
-                    "name":"",
-                    "rotation":0,
-                    "type":"",
-                    "visible":true,
-                    "width":16,
-                    "x":0,
-                    "y":0
-                   }],
-            "opacity":1,
-            "type":"objectgroup",
-            "visible":true,
-            "x":0,
-            "y":0
-           }
-       }],
-"tilewidth":16,
-"type":"tileset",
-"version":1.4
-};
+async function loadTileSet(name, desiredPixelsPerTile) {
+    let filenamePrefix = "tiles/";
+    let tileSetInfo = await getJsonData(filenamePrefix + name + '.json');
 
-let TEST_MAP = {
-    columns: 8,
-    rows: 6,
-    data: [32, 34, 34, 34, 34, 33, 34, 35, 62, 64, 65, 64, 62, 63, 65, 64, 122, 129, 130, 131, 129, 131, 131, 180, 151, 184, 183, 184, 182, 185, 189, 135, 151, 183, 183, 188, 183, 184, 185, 136, 151, 183, 183, 185, 183, 186, 185, 135]
-};
-
-let TWO_AREAS_MAP = {
-    data: [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 20, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 20, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 23, 2, 2, 2, 2, 24, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 4, 40, 40, 40, 40, 5, 7, 7, 7, 7, 7, 22, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 39, 40, 40, 40, 40, 40, 41, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    rows: 13,
-    columns: 36
-};
-
-async function loadTileSet(tileSetInfo, desiredPixelsPerTile) {
     let tileSetImg = new Image();
     const waitForImgLoad = () =>
         new Promise((resolve) => {
             tileSetImg.addEventListener('load', () => resolve(), {once: true});
         });
-    tileSetImg.src = tileSetInfo.image;
+    tileSetImg.src = filenamePrefix + tileSetInfo.image;
     await waitForImgLoad();
 
     let ppt = desiredPixelsPerTile;
@@ -395,4 +51,52 @@ async function loadTileSet(tileSetInfo, desiredPixelsPerTile) {
         canvasCtx: tileSetCanvasCtx,
         ppt: ppt
     }
+}
+
+function findObjectInMapByName(tileMapInfo, name) {
+    console.assert(tileMapInfo.layers.length > 1);
+    let layer = tileMapInfo.layers[1];
+    for (let i = 0; i < layer.objects.length; ++i) {
+        let o = layer.objects[i];
+        if (o.name === name) {
+            return o;
+        }
+    }
+    return null;
+}
+
+function getMapStartPoint(tileMapInfo) {
+    let o = findObjectInMapByName(tileMapInfo, 'start');
+    if (o === null) {
+        console.log('no start point found on tilemap!');
+        return { x: 0, y: 0 };
+    }
+    return {
+        x: o.x / tileMapInfo.tilewidth,
+        y: o.y / tileMapInfo.tilewidth
+    }
+}
+
+async function loadTileMap(name) {
+    let filenamePrefix = "tiles/";
+    let tileMapInfo = await getJsonData(filenamePrefix + name + '.json');
+    let start = getMapStartPoint(tileMapInfo);
+    let room1Info = findObjectInMapByName(tileMapInfo, 'room1');
+    console.assert(room1Info !== null);
+    let room1 = {
+        min: { x: room1Info.x / tileMapInfo.tilewidth, y: room1Info.y / tileMapInfo.tilewidth },
+        max: {
+            x: (room1Info.x + room1Info.width) / tileMapInfo.tilewidth,
+            y: (room1Info.y + room1Info.height) / tileMapInfo.tilewidth }
+    };
+
+    return {
+        info: tileMapInfo,
+        width: tileMapInfo.layers[0].width,
+        height: tileMapInfo.layers[0].height,
+        start: start,
+        room: room1
+    }
+
+    // return tileMapInfo;
 }

@@ -61,10 +61,12 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
 }
 
 class GameState {
-    constructor(canvas, sound, tileSet, pixelsPerUnit) {
+    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.sound = sound;
+        this.tileSet = tileSet;
+        this.tileMapInfo = tileMapInfo;
 
         this.pixelsPerUnit = pixelsPerUnit;
         this.widthInUnits = this.canvas.width / this.pixelsPerUnit;
@@ -72,8 +74,7 @@ class GameState {
 
         this.playerSpeed = this.widthInUnits / 2.5;
         this.playerSize = this.widthInUnits / 20.0;
-        let b = this.bounds();
-        this.playerPos = vecScale(vecAdd(b.min, b.max), 0.5);
+        this.playerPos = this.tileMapInfo.start;
         this.playerHeading = 0.0;
 
         this.BPM = 4 * 120.0;
@@ -98,7 +99,7 @@ class GameState {
         this.currentBeatIx = -1;
 
         this.enemySize = this.widthInUnits / 20.0;
-        this.enemies = generateRandomEnemies(this.NUM_BEATS, 10, b);
+        this.enemies = generateRandomEnemies(this.NUM_BEATS, 10, this.tileMapInfo.room);
 
         this.controlDir = { x: 0.0, y: 0.0 };
         this.slashPressed = false;
@@ -106,8 +107,6 @@ class GameState {
         this.scanning = false;
 
         this.prevTimeMillis = -1.0;
-
-        this.tileSet = tileSet;
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -115,8 +114,7 @@ class GameState {
     bounds() {
         return {
             min: { x: 0.0, y: 0.0 },
-            //max: { x: this.widthInUnits, y: this.heightInUnits }
-            max: { x: TWO_AREAS_MAP.columns, y: TWO_AREAS_MAP.rows }
+            max: { x: this.tileMapInfo.width, y: this.tileMapInfo.height }
         }
     }
     onKeyDown(event) {
@@ -276,7 +274,8 @@ function update(g, timeMillis) {
         }
     }
 
-    let tileMap = TWO_AREAS_MAP;
+    let tileMap = g.tileMapInfo.info.layers[0];
+
     let bounds = g.bounds();
     if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
         let oldPos = g.playerPos;
@@ -287,13 +286,13 @@ function update(g, timeMillis) {
             y: Math.max(0, Math.floor(newPos.y - 0.5*g.playerSize))
         };
         let maxTileOverlap = {
-            x: Math.min(tileMap.columns-1, Math.floor(newPos.x + 0.5*g.playerSize)),
-            y: Math.min(tileMap.rows-1, Math.floor(newPos.y + 0.5*g.playerSize))
+            x: Math.min(tileMap.width-1, Math.floor(newPos.x + 0.5*g.playerSize)),
+            y: Math.min(tileMap.height-1, Math.floor(newPos.y + 0.5*g.playerSize))
         };
         let collided = false;
         for (let col = minTileOverlap.x; col <= maxTileOverlap.x && !collided; ++col) {
             for (let row = minTileOverlap.y; row <= maxTileOverlap.y && !collided; ++row) {
-                let tileSetIdx = tileMap.data[row*tileMap.columns + col] - 1;
+                let tileSetIdx = tileMap.data[row*tileMap.width + col] - 1;
                 if (g.tileSet.collisions[tileSetIdx]) {
                     collided = true;
                 }
@@ -317,9 +316,9 @@ function update(g, timeMillis) {
 
     // Draw map.
     let ppt = g.tileSet.ppt;
-    for (let col = 0; col < tileMap.columns; ++col) {
-        for (let row = 0; row < tileMap.rows; ++row) {
-            let tileIdx = tileMap.data[row*tileMap.columns + col] - 1;
+    for (let col = 0; col < tileMap.width; ++col) {
+        for (let row = 0; row < tileMap.height; ++row) {
+            let tileIdx = tileMap.data[row*tileMap.width + col] - 1;
             let tile_j = Math.floor(tileIdx / g.tileSet.info.columns);
             let tile_i = tileIdx % g.tileSet.info.columns;
             // TODO: is this call doing scaling? Scaling is costly and we want to avoid it if possible.
@@ -437,11 +436,12 @@ async function main() {
     
     let pixelsPerUnit = 50;
 
-    let tileSet = await loadTileSet(SIMPLE_DUNGEON_TILE_SET_INFO, pixelsPerUnit);
+    let tileSet = await loadTileSet('dungeon_simple', pixelsPerUnit);
+    let tileMapInfo = await loadTileMap('level1');
 
     let canvas = document.getElementById('canvas');
     
-    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit);
+    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo);
 
     window.requestAnimationFrame((t) => update(gameState, t));
 }
