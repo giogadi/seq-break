@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.4" tiledversion="1.4.2" orientation="orthogonal" renderorder="right-down" width="80" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="7">
+<map version="1.4" tiledversion="1.4.2" orientation="orthogonal" renderorder="right-down" width="80" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="9">
  <editorsettings>
   <export target="level1.json" format="json"/>
  </editorsettings>
@@ -49,9 +49,21 @@
 </data>
  </layer>
  <objectgroup id="2" name="Object Layer 1">
-  <object id="2" name="room1" x="448" y="224" width="256" height="176"/>
+  <object id="2" name="room1" x="448" y="224" width="256" height="176">
+   <properties>
+    <property name="door1" type="object" value="7"/>
+    <property name="door2" type="object" value="8"/>
+    <property name="num_doors" type="int" value="2"/>
+   </properties>
+  </object>
   <object id="3" name="room2" x="800" y="288" width="208" height="64"/>
   <object id="6" name="start" x="320" y="304">
+   <point/>
+  </object>
+  <object id="7" name="room1door1" x="704" y="304">
+   <point/>
+  </object>
+  <object id="8" name="room1door2" x="704" y="320">
    <point/>
   </object>
  </objectgroup>

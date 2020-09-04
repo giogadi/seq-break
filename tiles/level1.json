@@ -31,6 +31,22 @@
                  "height":176,
                  "id":2,
                  "name":"room1",
+                 "properties":[
+                        {
+                         "name":"door1",
+                         "type":"object",
+                         "value":7
+                        }, 
+                        {
+                         "name":"door2",
+                         "type":"object",
+                         "value":8
+                        }, 
+                        {
+                         "name":"num_doors",
+                         "type":"int",
+                         "value":2
+                        }],
                  "rotation":0,
                  "type":"",
                  "visible":true,
@@ -60,6 +76,30 @@
                  "width":0,
                  "x":320,
                  "y":304
+                }, 
+                {
+                 "height":0,
+                 "id":7,
+                 "name":"room1door1",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":704,
+                 "y":304
+                }, 
+                {
+                 "height":0,
+                 "id":8,
+                 "name":"room1door2",
+                 "point":true,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":0,
+                 "x":704,
+                 "y":320
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -68,7 +108,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":7,
+ "nextobjectid":9,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.4.2",

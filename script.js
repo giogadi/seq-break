@@ -43,20 +43,20 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
             alive: true
         });
     }
-    for (i = 0; i < numEnemies; ++i) {
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: true
-        });
-        enemies.push({
-            pos: rand2dInBounds(bounds),
-            seq: sequence,
-            synth_ix: 2,
-            color: 'purple',
-            alive: true
-        });
-    }
+    // for (i = 0; i < numEnemies; ++i) {
+    //     let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
+    //     let sequence = new Array(numBeats).fill({
+    //         note: randomNote,
+    //         sustain: true
+    //     });
+    //     enemies.push({
+    //         pos: rand2dInBounds(bounds),
+    //         seq: sequence,
+    //         synth_ix: 2,
+    //         color: 'purple',
+    //         alive: true
+    //     });
+    // }
     return enemies;
 }
 
@@ -99,7 +99,7 @@ class GameState {
         this.currentBeatIx = -1;
 
         this.enemySize = this.widthInUnits / 20.0;
-        this.enemies = generateRandomEnemies(this.NUM_BEATS, 10, this.tileMapInfo.room);
+        this.enemies = [];
 
         this.controlDir = { x: 0.0, y: 0.0 };
         this.slashPressed = false;
@@ -107,6 +107,8 @@ class GameState {
         this.scanning = false;
 
         this.prevTimeMillis = -1.0;
+
+        this.roomLogic = new KillAllEnemiesRoomLogic(this, this.tileMapInfo.room, 10);
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -175,6 +177,10 @@ function update(g, timeMillis) {
     if (g.loopElapsedTime >= g.LOOP_TIME) {
         // TODO: Can this cause inaccuracies/drift?
         g.loopElapsedTime = 0.0;
+    }
+
+    if (g.roomLogic !== null && !g.roomLogic.finished) {
+        g.roomLogic.update();
     }
 
     let newBeat = false;
@@ -418,6 +424,36 @@ function update(g, timeMillis) {
     g.slashPressed = false;
 
     window.requestAnimationFrame((t) => update(g, t));
+}
+
+// For now, assume we instantiate this when the room has been entered by the player.
+class KillAllEnemiesRoomLogic {
+    constructor(gameState, roomSpec, numEnemiesPerType) {
+        this.gameState = gameState;
+        
+        this.gameState.enemies = generateRandomEnemies(
+            this.gameState.NUM_BEATS, numEnemiesPerType, roomSpec.bounds);
+        this.doorTileLocations = roomSpec.doorLocations;
+        const DOOR_TILE_ID = 205 + 1;
+        for (let doorIx = 0; doorIx < this.doorTileLocations.length; ++doorIx) {
+            let loc = this.doorTileLocations[doorIx];
+            setTile(this.gameState.tileMapInfo, loc.x, loc.y, DOOR_TILE_ID);
+        }
+        this.finished = false;
+    }
+    update() {
+        for (let eIx = 0; eIx < this.gameState.enemies.length; ++eIx) {
+            if (this.gameState.enemies[eIx].alive) {
+                return;
+            }
+        }
+        const OPEN_TILE_ID = 6 + 1;
+        for (let doorIx = 0; doorIx < this.doorTileLocations.length; ++doorIx) {
+            let loc = this.doorTileLocations[doorIx];
+            setTile(this.gameState.tileMapInfo, loc.x, loc.y, OPEN_TILE_ID);
+        }
+        this.finished = true;
+    }
 }
 
 async function main() {

@@ -65,6 +65,18 @@ function findObjectInMapByName(tileMapInfo, name) {
     return null;
 }
 
+function findObjectInMapById(tileMapInfo, id) {
+    console.assert(tileMapInfo.layers.length > 1);
+    let layer = tileMapInfo.layers[1];
+    for (let i = 0; i < layer.objects.length; ++i) {
+        let o = layer.objects[i];
+        if (o.id === id) {
+            return o;
+        }
+    }
+    return null;
+}
+
 function getMapStartPoint(tileMapInfo) {
     let o = findObjectInMapByName(tileMapInfo, 'start');
     if (o === null) {
@@ -83,11 +95,26 @@ async function loadTileMap(name) {
     let start = getMapStartPoint(tileMapInfo);
     let room1Info = findObjectInMapByName(tileMapInfo, 'room1');
     console.assert(room1Info !== null);
-    let room1 = {
+    let room1Bounds = {
         min: { x: room1Info.x / tileMapInfo.tilewidth, y: room1Info.y / tileMapInfo.tilewidth },
         max: {
             x: (room1Info.x + room1Info.width) / tileMapInfo.tilewidth,
             y: (room1Info.y + room1Info.height) / tileMapInfo.tilewidth }
+    };
+    let doorLocations = [];
+    for (let propIx = 0; propIx < room1Info.properties.length; ++propIx) {
+        let p = room1Info.properties[propIx];
+        if (p.name.startsWith('door')) {
+            let o = findObjectInMapById(tileMapInfo, p.value);
+            console.assert(o !== null);
+            doorLocations.push({
+                x: o.x / tileMapInfo.tilewidth, y: o.y / tileMapInfo.tilewidth
+            });
+        }
+    }
+    let room1 = {
+        bounds: room1Bounds,
+        doorLocations: doorLocations
     };
 
     return {
@@ -97,6 +124,9 @@ async function loadTileMap(name) {
         start: start,
         room: room1
     }
+}
 
-    // return tileMapInfo;
+function setTile(tileMapInfo, tileMapCol, tileMapRow, tileSetTileId) {
+    let tileMapIdx = tileMapInfo.width*tileMapRow + tileMapCol;
+    tileMapInfo.info.layers[0].data[tileMapIdx] = tileSetTileId;
 }
