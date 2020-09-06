@@ -1,65 +1,3 @@
-function generateRandomEnemies(numBeats, numEnemies, bounds) {
-    let enemies = []
-    const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-    // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
-    for (i = 0; i < numEnemies; ++i) {
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
-        // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
-        // let sequence = new Array(numBeats).fill(-1);
-        // if (i % 2 == 0) {
-        //     // Down-beats
-        //     for (let j = 0; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // } else {
-        //     // Up-beats
-        //     for (let j = 2; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // }
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: false
-        });
-        enemies.push({
-            pos: rand2dInBounds(bounds),
-            seq: sequence,
-            synth_ix: 0,
-            color: 'green',
-            alive: true
-        });
-    }
-    for (i = 0; i < numEnemies; ++i) {
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: false
-        });
-        enemies.push({
-            pos: rand2dInBounds(bounds),
-            seq: sequence,
-            synth_ix: 1,
-            color: 'darkgoldenrod',
-            alive: true
-        });
-    }
-    // for (i = 0; i < numEnemies; ++i) {
-    //     let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
-    //     let sequence = new Array(numBeats).fill({
-    //         note: randomNote,
-    //         sustain: true
-    //     });
-    //     enemies.push({
-    //         pos: rand2dInBounds(bounds),
-    //         seq: sequence,
-    //         synth_ix: 2,
-    //         color: 'purple',
-    //         alive: true
-    //     });
-    // }
-    return enemies;
-}
-
 class GameState {
     constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo) {
         this.canvas = canvas;
@@ -226,8 +164,8 @@ function update(g, timeMillis) {
             }
             if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[g.currentBeatIx].note >= 0) {
                 let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-                g.sequences[e.synth_ix][hitIx] = e.seq[g.currentBeatIx];
-                if (e.synth_ix !== 2) {
+                g.sequences[e.synthIx][hitIx] = e.seq[g.currentBeatIx];
+                if (e.synthIx !== 2) {
                     e.alive = false;
                 }
             }
@@ -244,10 +182,10 @@ function update(g, timeMillis) {
                 continue;
             }
             let d = vecNorm(vecAdd(e.pos, vecScale(g.playerPos, -1.0)));
-            if (nearestEnemies[e.synth_ix] == -1 ||
-                d < nearestDists[e.synth_ix]) {
-                nearestEnemies[e.synth_ix] = i;
-                nearestDists[e.synth_ix] = d;
+            if (nearestEnemies[e.synthIx] == -1 ||
+                d < nearestDists[e.synthIx]) {
+                nearestEnemies[e.synthIx] = i;
+                nearestDists[e.synthIx] = d;
             }
         }
     }
@@ -282,7 +220,6 @@ function update(g, timeMillis) {
 
     let tileMap = g.tileMapInfo.info.layers[0];
 
-    let bounds = g.bounds();
     if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
         let oldPos = g.playerPos;
         let newPos = vecAdd(
@@ -308,6 +245,10 @@ function update(g, timeMillis) {
             g.playerPos = newPos;
         }
         g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
+    }
+
+    for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
+        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx);
     }
 
     g.canvasCtx.fillStyle = 'grey';
