@@ -65,3 +65,8 @@ function doConvexPolygonsOverlap(poly1, poly2) {
     return !findSeparatingPlaneInPoly1Faces(poly1, poly2) &&
            !findSeparatingPlaneInPoly1Faces(poly2, poly1);
 }
+
+function isPointInBounds(point, bounds) {
+    return point.x >= bounds.min.x && point.x <= bounds.max.x &&
+        point.y >= bounds.min.y && point.y <= bounds.max.y;
+}

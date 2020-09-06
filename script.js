@@ -179,7 +179,7 @@ function update(g, timeMillis) {
         g.loopElapsedTime = 0.0;
     }
 
-    if (g.roomLogic !== null && !g.roomLogic.finished) {
+    if (g.roomLogic !== null) {
         g.roomLogic.update();
     }
 
@@ -430,29 +430,44 @@ function update(g, timeMillis) {
 class KillAllEnemiesRoomLogic {
     constructor(gameState, roomSpec, numEnemiesPerType) {
         this.gameState = gameState;
-        
+        this.roomSpec = roomSpec;
+        this.numEnemiesPerType = numEnemiesPerType;
+        // 0: untriggered
+        // 1: waiting for enemies to die
+        // 2: unlocked/finished
+        this.state = 0;
+    }
+    untriggeredLogic() {
+        if (!isPointInBounds(this.gameState.playerPos, this.roomSpec.bounds)) {
+            return;
+        }
         this.gameState.enemies = generateRandomEnemies(
-            this.gameState.NUM_BEATS, numEnemiesPerType, roomSpec.bounds);
-        this.doorTileLocations = roomSpec.doorLocations;
+            this.gameState.NUM_BEATS, this.numEnemiesPerType, this.roomSpec.bounds);
         const DOOR_TILE_ID = 205 + 1;
-        for (let doorIx = 0; doorIx < this.doorTileLocations.length; ++doorIx) {
-            let loc = this.doorTileLocations[doorIx];
+        for (let doorIx = 0; doorIx < this.roomSpec.doorLocations.length; ++doorIx) {
+            let loc = this.roomSpec.doorLocations[doorIx];
             setTile(this.gameState.tileMapInfo, loc.x, loc.y, DOOR_TILE_ID);
         }
-        this.finished = false;
+        this.state = 1;
     }
-    update() {
+    triggeredLogic() {
         for (let eIx = 0; eIx < this.gameState.enemies.length; ++eIx) {
             if (this.gameState.enemies[eIx].alive) {
                 return;
             }
         }
         const OPEN_TILE_ID = 6 + 1;
-        for (let doorIx = 0; doorIx < this.doorTileLocations.length; ++doorIx) {
-            let loc = this.doorTileLocations[doorIx];
+        for (let doorIx = 0; doorIx < this.roomSpec.doorLocations.length; ++doorIx) {
+            let loc = this.roomSpec.doorLocations[doorIx];
             setTile(this.gameState.tileMapInfo, loc.x, loc.y, OPEN_TILE_ID);
         }
-        this.finished = true;
+        this.state = 2;
+    }
+    update() {
+        switch (this.state) {
+            case 0: this.untriggeredLogic(); break;
+            case 1: this.triggeredLogic(); break;
+        }
     }
 }
 
