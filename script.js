@@ -36,7 +36,6 @@ class GameState {
         this.loopElapsedTime = 0.0;
         this.currentBeatIx = -1;
 
-        this.enemySize = this.widthInUnits / 20.0;
         this.enemies = [];
 
         this.controlDir = { x: 0.0, y: 0.0 };
@@ -151,7 +150,7 @@ function update(g, timeMillis) {
 
         for (let i = 0; i < g.enemies.length; ++i) {
             let e = g.enemies[i];
-            let s = 0.5*g.enemySize;
+            let s = 0.5 * e.sideLength;
             let enemyHitBox = [
                 vecAdd(e.pos, { x: -s, y: s }),
                 vecAdd(e.pos, { x: -s, y: -s }),
@@ -220,35 +219,20 @@ function update(g, timeMillis) {
 
     let tileMap = g.tileMapInfo.info.layers[0];
 
+    // Player position update
     if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
         let oldPos = g.playerPos;
         let newPos = vecAdd(
             g.playerPos, vecScale(vecNormalized(g.controlDir), g.playerSpeed * dt));
-        let minTileOverlap = {
-            x: Math.max(0, Math.floor(newPos.x - 0.5*g.playerSize)),
-            y: Math.max(0, Math.floor(newPos.y - 0.5*g.playerSize))
-        };
-        let maxTileOverlap = {
-            x: Math.min(tileMap.width-1, Math.floor(newPos.x + 0.5*g.playerSize)),
-            y: Math.min(tileMap.height-1, Math.floor(newPos.y + 0.5*g.playerSize))
-        };
-        let collided = false;
-        for (let col = minTileOverlap.x; col <= maxTileOverlap.x && !collided; ++col) {
-            for (let row = minTileOverlap.y; row <= maxTileOverlap.y && !collided; ++row) {
-                let tileSetIdx = tileMap.data[row*tileMap.width + col] - 1;
-                if (g.tileSet.collisions[tileSetIdx]) {
-                    collided = true;
-                }
-            }
-        }
-        if (!collided) {
+        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.tileMapInfo, g.tileSet)) {
             g.playerPos = newPos;
         }
         g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
     }
 
+    // Enemy behavior update
     for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
-        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx);
+        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies);
     }
 
     g.canvasCtx.fillStyle = 'grey';
@@ -301,7 +285,7 @@ function update(g, timeMillis) {
             continue;
         }
         let posPx = vecScale(e.pos, g.pixelsPerUnit);
-        let sizePx = g.enemySize * g.pixelsPerUnit;
+        let sizePx = e.sideLength * g.pixelsPerUnit;
         g.canvasCtx.fillStyle = e.color;
         g.canvasCtx.fillRect(
             posPx.x - 0.5*sizePx,
@@ -373,6 +357,7 @@ class KillAllEnemiesRoomLogic {
         this.gameState = gameState;
         this.roomSpec = roomSpec;
         this.numEnemiesPerType = numEnemiesPerType;
+        this.ENEMY_SIZE = gameState.widthInUnits / 20.0;
         // 0: untriggered
         // 1: waiting for enemies to die
         // 2: unlocked/finished
@@ -383,7 +368,8 @@ class KillAllEnemiesRoomLogic {
             return;
         }
         this.gameState.enemies = generateRandomEnemies(
-            this.gameState.NUM_BEATS, this.numEnemiesPerType, this.roomSpec.bounds);
+            this.gameState.NUM_BEATS, this.numEnemiesPerType, this.roomSpec.bounds, this.ENEMY_SIZE,
+            this.gameState.tileMapInfo, this.gameState.tileSet);
         const DOOR_TILE_ID = 205 + 1;
         for (let doorIx = 0; doorIx < this.roomSpec.doorLocations.length; ++doorIx) {
             let loc = this.roomSpec.doorLocations[doorIx];

@@ -70,3 +70,15 @@ function isPointInBounds(point, bounds) {
     return point.x >= bounds.min.x && point.x <= bounds.max.x &&
         point.y >= bounds.min.y && point.y <= bounds.max.y;
 }
+
+function doAABBsOverlap(center1, sideLength1, center2, sideLength2) {
+    let halfLength1 = 0.5 * sideLength1;
+    let halfLength2 = 0.5 * sideLength2;
+    if (center1.x + halfLength1 < center2.x - halfLength2 ||
+        center1.y + halfLength1 < center2.y - halfLength2 ||
+        center1.x - halfLength1 > center2.x + halfLength2 ||
+        center1.y - halfLength1 > center2.y + halfLength2) {
+        return false;
+    }
+    return true;
+}

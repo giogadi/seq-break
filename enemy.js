@@ -1,23 +1,37 @@
+function aabbCollidesWithSomeEnemy(center, sideLength, enemies, ignoredEnemy = null) {
+    for (let eIx = 0; eIx < enemies.length; ++eIx) {
+        let e = enemies[eIx];
+        if (!e.alive || e === ignoredEnemy) {
+            continue;
+        }
+        if (doAABBsOverlap(center, sideLength, e.pos, e.sideLength)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class Enemy {
-    constructor(pos, seq, synthIx, color) {
+    constructor(pos, sideLength, seq, synthIx, color) {
         this.pos = pos;
+        this.sideLength = sideLength;
         this.seq = seq;
         this.synthIx = synthIx;
         this.color = color;
         this.alive = true;
     }
-    update(dt) {}
+    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet) {}
 }
 class ShooterEnemy extends Enemy {
-    constructor(pos, seq, synthIx, color) {
-        super(pos, seq, synthIx, color);
+    constructor(pos, sideLength, seq, synthIx, color) {
+        super(pos, sideLength, seq, synthIx, color);
         this.beatsSinceLastChange = -1;
         this.BEATS_PER_CHANGE = 4;
         this.STOP_BEATS = Math.floor(this.BEATS_PER_CHANGE / 2);
         this.SPEED = 3.0;
         this.v = { x: 0.0, y: 0.0 };
     }
-    update(dt, isNewBeat, currentBeatIx) {
+    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies) {
         if (isNewBeat) {
             ++this.beatsSinceLastChange;
             if (this.beatsSinceLastChange >= this.BEATS_PER_CHANGE) {
@@ -31,15 +45,27 @@ class ShooterEnemy extends Enemy {
                 this.v = { x: this.SPEED*Math.cos(a), y: this.SPEED*Math.sin(a) };
             }
         }
-        this.pos = vecAdd(this.pos, vecScale(this.v, dt));
+        let newPos = vecAdd(this.pos, vecScale(this.v, dt));
+        if (isBoxInCollisionWithMap(newPos, this.sideLength, tileMapInfo, tileSet) ||
+            aabbCollidesWithSomeEnemy(newPos, this.sideLength, enemies, this)) {
+            this.v = vecScale(this.v, -1.0);
+        } else {
+            this.pos = vecAdd(this.pos, vecScale(this.v, dt));
+        }
     }
 }
 
-function generateRandomEnemies(numBeats, numEnemies, bounds) {
+function generateRandomEnemies(numBeats, numEnemies, bounds, enemySize, tileMapInfo, tileSet) {
     let enemies = []
     const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
     // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
     for (i = 0; i < numEnemies; ++i) {
+        let randPos = { x: 0.0, y: 0.0 };
+        do {
+            randPos = rand2dInBounds(bounds);
+        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
+                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
+
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
         // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
         // let sequence = new Array(numBeats).fill(-1);
@@ -58,15 +84,20 @@ function generateRandomEnemies(numBeats, numEnemies, bounds) {
             note: randomNote,
             sustain: false
         });
-        enemies.push(new ShooterEnemy(rand2dInBounds(bounds), sequence, 0, 'green'));
+        enemies.push(new ShooterEnemy(randPos, enemySize, sequence, 0, 'green'));
     }
     for (i = 0; i < numEnemies; ++i) {
+        let randPos = { x: 0.0, y: 0.0 };
+        do {
+            randPos = rand2dInBounds(bounds);
+        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
+                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
         let sequence = new Array(numBeats).fill({
             note: randomNote,
             sustain: false
         });
-        enemies.push(new Enemy(rand2dInBounds(bounds), sequence, 1, 'darkgoldenrod'));
+        enemies.push(new Enemy(randPos, enemySize, sequence, 1, 'darkgoldenrod'));
     }
     // for (i = 0; i < numEnemies; ++i) {
     //     let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
