@@ -52,8 +52,15 @@ class GameState {
 
         this.prevTimeMillis = -1.0;
 
-        this.roomLogic = new KillAllEnemiesRoomLogic(this, this.tileMapInfo.room);
-        // this.roomLogic = new OneRoomScript(this, this.NUM_BEATS);
+        this.roomLogics = [];
+        for (let i = 0; i < this.tileMapInfo.rooms.length; ++i) {
+            this.roomLogics.push(new KillAllEnemiesRoomLogic(this, this.tileMapInfo.rooms[i]));
+        }
+
+        // TODO THIS SUCKS AND IS BUSTED
+        if (this.roomLogics.length === 0) {
+            this.roomLogics.push(new OneRoomScript(this, this.NUM_BEATS));
+        }
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -134,8 +141,8 @@ function update(g, timeMillis) {
         }
     }
 
-    if (g.roomLogic !== null) {
-        g.roomLogic.update();
+    for (let roomIx = 0; roomIx < g.roomLogics.length; ++roomIx) {
+        g.roomLogics[roomIx].update();
     }
 
     // Handle slash
@@ -424,6 +431,7 @@ async function main() {
 
     let tileSet = await loadTileSet('dungeon_simple', pixelsPerUnit);
     let tileMapInfo = await loadTileMap('level1');
+    // let tileMapInfo = await loadTileMap('one_room_16x12');
 
     let canvas = document.getElementById('canvas');
     

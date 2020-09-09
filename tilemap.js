@@ -93,36 +93,40 @@ async function loadTileMap(name) {
     let filenamePrefix = "tiles/";
     let tileMapInfo = await getJsonData(filenamePrefix + name + '.json');
     let start = getMapStartPoint(tileMapInfo);
+    console.assert(start !== null);
+
+    let rooms = [];
     let room1Info = findObjectInMapByName(tileMapInfo, 'room1');
-    console.assert(room1Info !== null);
-    let room1Bounds = {
-        min: { x: room1Info.x / tileMapInfo.tilewidth, y: room1Info.y / tileMapInfo.tilewidth },
-        max: {
-            x: (room1Info.x + room1Info.width) / tileMapInfo.tilewidth,
-            y: (room1Info.y + room1Info.height) / tileMapInfo.tilewidth }
-    };
-    let doorLocations = [];
-    for (let propIx = 0; propIx < room1Info.properties.length; ++propIx) {
-        let p = room1Info.properties[propIx];
-        if (p.name.startsWith('door')) {
-            let o = findObjectInMapById(tileMapInfo, p.value);
-            console.assert(o !== null);
-            doorLocations.push({
-                x: o.x / tileMapInfo.tilewidth, y: o.y / tileMapInfo.tilewidth
-            });
+    if (room1Info !== null) {
+        let room1Bounds = {
+            min: { x: room1Info.x / tileMapInfo.tilewidth, y: room1Info.y / tileMapInfo.tilewidth },
+            max: {
+                x: (room1Info.x + room1Info.width) / tileMapInfo.tilewidth,
+                y: (room1Info.y + room1Info.height) / tileMapInfo.tilewidth }
+        };
+        let doorLocations = [];
+        for (let propIx = 0; propIx < room1Info.properties.length; ++propIx) {
+            let p = room1Info.properties[propIx];
+            if (p.name.startsWith('door')) {
+                let o = findObjectInMapById(tileMapInfo, p.value);
+                console.assert(o !== null);
+                doorLocations.push({
+                    x: o.x / tileMapInfo.tilewidth, y: o.y / tileMapInfo.tilewidth
+                });
+            }
         }
+        rooms.push({
+            bounds: room1Bounds,
+            doorLocations: doorLocations
+        });
     }
-    let room1 = {
-        bounds: room1Bounds,
-        doorLocations: doorLocations
-    };
 
     return {
         info: tileMapInfo,
         width: tileMapInfo.layers[0].width,
         height: tileMapInfo.layers[0].height,
         start: start,
-        room: room1
+        rooms: rooms
     }
 }
 
