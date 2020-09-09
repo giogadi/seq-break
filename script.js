@@ -52,7 +52,8 @@ class GameState {
 
         this.prevTimeMillis = -1.0;
 
-        this.roomLogic = new KillAllEnemiesRoomLogic(this, this.tileMapInfo.room, 10);
+        this.roomLogic = new KillAllEnemiesRoomLogic(this, this.tileMapInfo.room);
+        // this.roomLogic = new OneRoomScript(this, this.NUM_BEATS);
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
         window.addEventListener('keyup', (e) => this.onKeyUp(e));
@@ -123,10 +124,6 @@ function update(g, timeMillis) {
         g.loopElapsedTime = 0.0;
     }
 
-    if (g.roomLogic !== null) {
-        g.roomLogic.update();
-    }
-
     let newBeat = false;
     {
         let newBeatIx = Math.floor((g.loopElapsedTime / g.LOOP_TIME) * g.NUM_BEATS);
@@ -135,6 +132,10 @@ function update(g, timeMillis) {
             newBeat = true;
             g.currentBeatIx = newBeatIx;
         }
+    }
+
+    if (g.roomLogic !== null) {
+        g.roomLogic.update();
     }
 
     // Handle slash
@@ -403,53 +404,6 @@ function update(g, timeMillis) {
     g.slashPressed = false;
 
     window.requestAnimationFrame((t) => update(g, t));
-}
-
-// For now, assume we instantiate this when the room has been entered by the player.
-class KillAllEnemiesRoomLogic {
-    constructor(gameState, roomSpec, numEnemiesPerType) {
-        this.gameState = gameState;
-        this.roomSpec = roomSpec;
-        this.numEnemiesPerType = numEnemiesPerType;
-        this.ENEMY_SIZE = gameState.widthInUnits / 20.0;
-        // 0: untriggered
-        // 1: waiting for enemies to die
-        // 2: unlocked/finished
-        this.state = 0;
-    }
-    untriggeredLogic() {
-        if (!isPointInBounds(this.gameState.playerPos, this.roomSpec.bounds)) {
-            return;
-        }
-        this.gameState.enemies = generateRandomEnemies(
-            this.gameState.NUM_BEATS, this.numEnemiesPerType, this.roomSpec.bounds, this.ENEMY_SIZE,
-            this.gameState.tileMapInfo, this.gameState.tileSet);
-        const DOOR_TILE_ID = 205 + 1;
-        for (let doorIx = 0; doorIx < this.roomSpec.doorLocations.length; ++doorIx) {
-            let loc = this.roomSpec.doorLocations[doorIx];
-            setTile(this.gameState.tileMapInfo, loc.x, loc.y, DOOR_TILE_ID);
-        }
-        this.state = 1;
-    }
-    triggeredLogic() {
-        for (let eIx = 0; eIx < this.gameState.enemies.length; ++eIx) {
-            if (this.gameState.enemies[eIx].alive) {
-                return;
-            }
-        }
-        const OPEN_TILE_ID = 6 + 1;
-        for (let doorIx = 0; doorIx < this.roomSpec.doorLocations.length; ++doorIx) {
-            let loc = this.roomSpec.doorLocations[doorIx];
-            setTile(this.gameState.tileMapInfo, loc.x, loc.y, OPEN_TILE_ID);
-        }
-        this.state = 2;
-    }
-    update() {
-        switch (this.state) {
-            case 0: this.untriggeredLogic(); break;
-            case 1: this.triggeredLogic(); break;
-        }
-    }
 }
 
 async function main() {
