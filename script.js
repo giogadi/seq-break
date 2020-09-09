@@ -25,6 +25,8 @@ class GameState {
         this.kickSequence = new Array(this.NUM_BEATS).fill(false);
         this.kickSequence[0] = this.kickSequence[4] = this.kickSequence[8] = this.kickSequence[12] = true;
 
+        this.snareSequence = new Array(this.NUM_BEATS).fill(false);
+
         this.sequences = new Array(this.NUM_SYNTHS);
         for (let i = 0; i < this.NUM_SYNTHS; ++i) {
             this.sequences[i] = new Array(this.NUM_BEATS).fill({
@@ -37,6 +39,11 @@ class GameState {
         this.currentBeatIx = -1;
 
         this.enemies = [];
+        const NUM_BULLETS = 20;
+        this.bullets = [];
+        for (let i = 0; i < NUM_BULLETS; ++i) {
+            this.bullets.push(new Bullet({ x: 0, y: 0 }, 0, false));
+        }
 
         this.controlDir = { x: 0.0, y: 0.0 };
         this.slashPressed = false;
@@ -130,6 +137,7 @@ function update(g, timeMillis) {
         }
     }
 
+    // Handle slash
     let hitBox = null;
     let enemyHitBoxes = [];
     if (g.slashPressed || g.sustaining) {
@@ -168,6 +176,28 @@ function update(g, timeMillis) {
                     e.alive = false;
                 }
             }
+        }
+        let playSnare = false;
+        for (let i = 0; i < g.bullets.length; ++i) {
+            let b = g.bullets[i];
+            let s = 0.5 * b.sideLength;
+            let bulletHitBox = [
+                vecAdd(b.pos, { x: -s, y: s }),
+                vecAdd(b.pos, { x: -s, y: -s }),
+                vecAdd(b.pos, { x: s, y: -s }),
+                vecAdd(b.pos, { x: s, y: s })
+            ];
+            if (!b.alive) {
+                continue;
+            }
+            if (doConvexPolygonsOverlap(hitBox, bulletHitBox)) {
+                playSnare = true;
+                b.alive = false;
+            }
+        }
+        if (playSnare) {
+            let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
+            g.snareSequence[hitIx] = true;
         }
     }
 
@@ -215,6 +245,10 @@ function update(g, timeMillis) {
         if (g.kickSequence[g.currentBeatIx]) {
             playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[0]);
         }
+        if (g.snareSequence[g.currentBeatIx]) {
+            playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[1]);
+            // g.snareSequence[g.currentBeatIx] = false;
+        }
     }
 
     let tileMap = g.tileMapInfo.info.layers[0];
@@ -232,7 +266,15 @@ function update(g, timeMillis) {
 
     // Enemy behavior update
     for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
-        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies);
+        if (!g.enemies[eIx].alive) {
+            continue;
+        }
+        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets);
+    }
+
+    // Bullet update
+    for (let bIx = 0; bIx < g.bullets.length; ++bIx) {
+        g.bullets[bIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.playerPos);
     }
 
     g.canvasCtx.fillStyle = 'grey';
@@ -340,6 +382,18 @@ function update(g, timeMillis) {
             g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
         }
         g.canvasCtx.stroke();
+    }
+
+    // Draw bullets
+    for (let bIx = 0; bIx < g.bullets.length; ++bIx) {
+        let b = g.bullets[bIx];
+        if (!b.alive) {
+            continue;
+        }
+        g.canvasCtx.fillStyle = 'cyan';
+        let posPx = vecScale(b.pos, g.pixelsPerUnit);
+        let sizePx = b.sideLength * g.pixelsPerUnit;
+        g.canvasCtx.fillRect(posPx.x - 0.5*sizePx, posPx.y - 0.5*sizePx, sizePx, sizePx);
     }
 
     g.canvasCtx.restore();

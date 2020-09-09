@@ -116,7 +116,8 @@ function initSynth(audioCtx, synthSpec) {
 }
 
 function initSound() {
-    let soundNames = ['kick', 'snare'];
+    // let soundNames = ['kick', 'snare'];
+    let soundNames = ['kick', 'hihat'];
     let sounds = soundNames.map(function(soundName) {
         return getSoundData(soundName + '.wav')
     });
