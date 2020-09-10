@@ -70,11 +70,11 @@ class HomingBullet extends Bullet {
 }
 
 class Enemy {
-    constructor(pos, sideLength, seq, synthIx, color) {
+    constructor(pos, sideLength, seq, sequenceId, color) {
         this.pos = pos;
         this.sideLength = sideLength;
         this.seq = seq;
-        this.synthIx = synthIx;
+        this.sequenceId = sequenceId;
         this.color = color;
         this.alive = true;
     }
@@ -123,8 +123,8 @@ class RhythmEnemyShootHoming extends RhythmEnemyLogic {
 // If you set the initBeatIx to < 0, that will delay actions until we get to 0.
 // A way to help sync up with another sequence.
 class RhythmEnemy extends Enemy {
-    constructor(pos, sideLength, soundSeq, synthIx, color, logicSeq, initBeatIx = 0) {
-        super(pos, sideLength, soundSeq, synthIx, color);
+    constructor(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx = 0) {
+        super(pos, sideLength, soundSeq, sequenceId, color);
         this.logicSeq = logicSeq;
         this.v = { x: 0.0, y: 0.0 };
         this.currentBeatIx = initBeatIx;
@@ -150,7 +150,7 @@ class RhythmEnemy extends Enemy {
     }
 }
 
-function makeStationaryShooter(pos, sideLength, soundSeq, synthIx, color, initBeatIx = 0) {
+function makeStationaryShooter(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0) {
     // Note: new Array(16).fill([]) doesn't work because that assigns all the elements
     // to the _same_ empty array!
     let logicSeq = new Array(32);
@@ -158,17 +158,17 @@ function makeStationaryShooter(pos, sideLength, soundSeq, synthIx, color, initBe
         logicSeq[i] = [];
     }
     logicSeq[0].push(new RhythmEnemyShootHoming());
-    return new RhythmEnemy(pos, sideLength, soundSeq, synthIx, color, logicSeq, initBeatIx);
+    return new RhythmEnemy(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx);
 }
 
-function makeMover(pos, sideLength, soundSeq, synthIx, color, initBeatIx = 0) {
+function makeMover(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0) {
     let logicSeq = new Array(4);
     for (let i = 0; i < logicSeq.length; ++i) {
         logicSeq[i] = [];
     }
     logicSeq[0].push(new RhythmEnemySetVelocity({ x: 0.0, y: 0.0 }));
     logicSeq[2].push(new RhythmEnemyRandomDirection(3.0));
-    return new RhythmEnemy(pos, sideLength, soundSeq, synthIx, color, logicSeq, initBeatIx);
+    return new RhythmEnemy(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx);
 }
 
 function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileMapInfo, tileSet) {
@@ -210,7 +210,8 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
             note: randomNote,
             sustain: false
         });
-        enemies.push(makeMover(randPos, enemySize, sequence, 0, 'green', -delayBeats));
+        let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
+        enemies.push(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
     }
     for (i = 0; i < 4; ++i) {
         let randPos = { x: 0.0, y: 0.0 };
@@ -223,9 +224,10 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
             note: randomNote,
             sustain: false
         });
+        let sequenceId = new SequenceId(SequenceType.SYNTH, 1);
         // Further offset each enemy's logic by 1 downbeat so they don't all shoot at the same time.
         let delay = delayBeats + 4*i;
-        enemies.push(makeStationaryShooter(randPos, enemySize, sequence, 1, 'darkgoldenrod', -delay));
+        enemies.push(makeStationaryShooter(randPos, enemySize, sequence, sequenceId, 'darkgoldenrod', -delay));
     }
     // for (i = 0; i < numEnemies; ++i) {
     //     let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);

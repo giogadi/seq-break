@@ -1,3 +1,9 @@
+// function makeKickWave() {
+//     {
+//         let sequence = new Array(16).fill()
+//     }
+// }
+
 class OneRoomScript {
     constructor(gameState, numBeats) {
         const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
@@ -6,11 +12,11 @@ class OneRoomScript {
             note: randomNote,
             sustain: false
         });
-        let p = { x: 30.0, y: 15.0 };
-        let enemySize = gameState.widthInUnits / 20.0;
+        let p = { x: 4.0, y: 3.0 };
+        let enemySize = 1.0;
         
-        //gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, 1, 'darkgoldenrod'));
-        gameState.enemies.push(makeMover(p, enemySize, sequence, 1, 'darkgoldenrod'));
+        gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, 1, 'darkgoldenrod'));
+        //gameState.enemies.push(makeMover(p, enemySize, sequence, 1, 'darkgoldenrod'));
     }
     update() {
         
@@ -21,7 +27,7 @@ class KillAllEnemiesRoomLogic {
     constructor(gameState, roomSpec) {
         this.gameState = gameState;
         this.roomSpec = roomSpec;
-        this.ENEMY_SIZE = gameState.widthInUnits / 20.0;
+        this.ENEMY_SIZE = 1.0;
         // 0: untriggered
         // 1: waiting for enemies to die
         // 2: unlocked/finished

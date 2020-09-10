@@ -1,3 +1,15 @@
+const SequenceType = {
+    SYNTH: 0,
+    SAMPLE: 1
+};
+
+class SequenceId {
+    constructor(sequenceType, sequenceIx) {
+        this.type = sequenceType;
+        this.ix = sequenceIx;
+    }
+}
+
 class GameState {
     constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo) {
         this.canvas = canvas;
@@ -7,11 +19,11 @@ class GameState {
         this.tileMapInfo = tileMapInfo;
 
         this.pixelsPerUnit = pixelsPerUnit;
-        this.widthInUnits = this.canvas.width / this.pixelsPerUnit;
-        this.heightInUnits = this.canvas.height / this.pixelsPerUnit;
+        this.viewWidthInUnits = this.canvas.width / this.pixelsPerUnit;
+        this.viewHeightInUnits = this.canvas.height / this.pixelsPerUnit;
 
-        this.playerSpeed = this.widthInUnits / 2.5;
-        this.playerSize = this.widthInUnits / 20.0;
+        this.playerSpeed = 6.0;
+        this.playerSize = 1.0;
         this.playerPos = this.tileMapInfo.start;
         this.playerHeading = 0.0;
 
@@ -22,17 +34,23 @@ class GameState {
 
         this.NUM_SYNTHS = 3;
 
-        this.kickSequence = new Array(this.NUM_BEATS).fill(false);
-        this.kickSequence[0] = this.kickSequence[4] = this.kickSequence[8] = this.kickSequence[12] = true;
+        // For now, sample sequence elements are interpreted in a binary way
+        // (<0 for nothing, else play a note). sustain is ignored.
+        this.sampleSequences = new Array(this.sound.drumSounds.length);
+        for (let i = 0; i < this.sampleSequences.length; ++i) {
+            this.sampleSequences[i] = [];
+            for (let j = 0; j < this.NUM_BEATS; ++j) {
+                this.sampleSequences[i][j] = { note: -1, sustain: false };
+            }
+        }
+        this.sampleSequences[0][0].note = this.sampleSequences[0][4].note = this.sampleSequences[0][8].note = this.sampleSequences[0][12].note = 0;
 
-        this.snareSequence = new Array(this.NUM_BEATS).fill(false);
-
-        this.sequences = new Array(this.NUM_SYNTHS);
+        this.synthSequences = new Array(this.NUM_SYNTHS);
         for (let i = 0; i < this.NUM_SYNTHS; ++i) {
-            this.sequences[i] = new Array(this.NUM_BEATS).fill({
-                note: -1,
-                sustain: false
-            });
+            this.synthSequences[i] = [];
+            for (let j = 0; j < this.NUM_BEATS; ++j) {
+                this.synthSequences[i][j] = { note: -1, sustain: false }
+            }
         }
 
         this.loopElapsedTime = 0.0;
@@ -93,6 +111,16 @@ class GameState {
             case "d": this.controlDir.x -= 1.0; break;
             case "k": this.scanning = false; break;
             case "l": this.sustaining = false; break;
+        }
+    }
+    getSequence(sequenceId) {
+        switch (sequenceId.type) {
+            case SequenceType.SYNTH: {
+                return this.synthSequences[sequenceId.ix];
+            }
+            case SequenceType.SAMPLE: {
+                return this.sampleSequences[sequenceId.ix];
+            }
         }
     }
 }
@@ -179,8 +207,10 @@ function update(g, timeMillis) {
             }
             if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[g.currentBeatIx].note >= 0) {
                 let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-                g.sequences[e.synthIx][hitIx] = e.seq[g.currentBeatIx];
-                if (e.synthIx !== 2) {
+                let seq = g.getSequence(e.sequenceId);
+                seq[hitIx] = e.seq[g.currentBeatIx];
+                // TODO BLAGH
+                if (e.sequenceId.type !== SequenceType.SYNTH || e.sequenceId.ix !== 2) {
                     e.alive = false;
                 }
             }
@@ -205,7 +235,7 @@ function update(g, timeMillis) {
         }
         if (playSnare) {
             let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-            g.snareSequence[hitIx] = true;
+            g.sampleSequences[1][hitIx].note = 0;
         }
     }
 
@@ -229,10 +259,10 @@ function update(g, timeMillis) {
 
     if (newBeat) {
         for (let i = 0; i < g.NUM_SYNTHS; ++i) {
-            if (g.sequences[i][g.currentBeatIx].note >= 0) {
+            if (g.synthSequences[i][g.currentBeatIx].note >= 0) {
                 synthPlayVoice(
-                    g.sound.synths[i], 0, g.sequences[i][g.currentBeatIx].note,
-                    g.sequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
+                    g.sound.synths[i], 0, g.synthSequences[i][g.currentBeatIx].note,
+                    g.synthSequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
             } else {
                 synthReleaseVoice(g.sound.synths[i], 0, g.sound.audioCtx);
             }
@@ -250,12 +280,11 @@ function update(g, timeMillis) {
                 synthReleaseVoice(g.sound.auxSynths[i], 0, g.sound.audioCtx);
             }
         }
-        if (g.kickSequence[g.currentBeatIx]) {
-            playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[0]);
-        }
-        if (g.snareSequence[g.currentBeatIx]) {
-            playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[1]);
-            // g.snareSequence[g.currentBeatIx] = false;
+
+        for (let i = 0; i < g.sampleSequences.length; ++i) {
+            if (g.sampleSequences[i][g.currentBeatIx].note >= 0) {
+                playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i])
+            }
         }
     }
 
@@ -292,6 +321,7 @@ function update(g, timeMillis) {
     g.canvasCtx.save();
     let centerPosPx = { x: Math.floor(0.5 * g.canvas.width), y: Math.floor(0.5 * g.canvas.height) };
     let cameraPx = { x: Math.floor(g.playerPos.x * g.pixelsPerUnit), y: Math.floor(g.playerPos.y * g.pixelsPerUnit) };
+    // let cameraPx = centerPosPx;
     let centerToCamera = vecAdd(cameraPx, vecScale(centerPosPx, -1.0));
     g.canvasCtx.translate(-centerToCamera.x, -centerToCamera.y);
 
