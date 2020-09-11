@@ -1,22 +1,55 @@
-// function makeKickWave() {
-//     {
-//         let sequence = new Array(16).fill()
-//     }
-// }
+class RoomState {
+    onStateStart() {
+
+    }
+    // If this returns TRUE, then this state is finished.
+    update() {
+        return true;
+    }
+    onStateEnd() {
+
+    }
+}
+
+function makeKickWave() {
+    enemies = [];
+    let enemySize = 1.0;
+    let seqId = new SequenceId(SequenceType.SAMPLE, 0);
+    {
+        let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
+        sequence[0].note = 0;
+        let p = { x: 4.0, y: 3.0 };
+        enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+    }
+    {
+        let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
+        sequence[4].note = 0;
+        let p = { x: 12.0, y: 3.0 };
+        enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+    }
+    {
+        let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
+        sequence[8].note = 0;
+        let p = { x: 12.0, y: 9.0 };
+        enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+    }
+    {
+        let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
+        sequence[12].note = 0;
+        let p = { x: 4.0, y: 9.0 };
+        enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+    }
+    return enemies;
+}
 
 class OneRoomScript {
     constructor(gameState, numBeats) {
-        const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: false
-        });
-        let p = { x: 4.0, y: 3.0 };
-        let enemySize = 1.0;
-        
-        gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, 1, 'darkgoldenrod'));
-        //gameState.enemies.push(makeMover(p, enemySize, sequence, 1, 'darkgoldenrod'));
+        // clear out default kick sequence
+        let kickSeq = gameState.sampleSequences[0];
+        for (let i = 0; i < kickSeq.length; ++i) {
+            kickSeq[i].note = -1;
+        }
+        gameState.enemies = makeKickWave();
     }
     update() {
         

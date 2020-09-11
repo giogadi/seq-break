@@ -11,12 +11,17 @@ class SequenceId {
 }
 
 class GameState {
-    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo) {
+    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
+        this.canvasCtx.mozImageSmoothingEnabled = false;
+        this.canvasCtx.webkitImageSmoothingEnabled = false;
+        this.canvasCtx.msImageSmoothingEnabled = false;
+        this.canvasCtx.imageSmoothingEnabled = false;
         this.sound = sound;
         this.tileSet = tileSet;
         this.tileMapInfo = tileMapInfo;
+        this.barrierImg = barrierImg;
 
         this.pixelsPerUnit = pixelsPerUnit;
         this.viewWidthInUnits = this.canvas.width / this.pixelsPerUnit;
@@ -160,8 +165,11 @@ function update(g, timeMillis) {
     }
 
     let newBeat = false;
+    let fracAheadOfCurrent = -1;
     {
-        let newBeatIx = Math.floor((g.loopElapsedTime / g.LOOP_TIME) * g.NUM_BEATS);
+        let currentBeatContinuous = (g.loopElapsedTime / g.LOOP_TIME) * g.NUM_BEATS;
+        let newBeatIx = Math.floor(currentBeatContinuous);
+        fracAheadOfCurrent = currentBeatContinuous - newBeatIx;
         console.assert(newBeatIx < g.NUM_BEATS);
         if (newBeatIx !== g.currentBeatIx) {
             newBeat = true;
@@ -205,13 +213,53 @@ function update(g, timeMillis) {
             if (!e.alive) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHitBox) && e.seq[g.currentBeatIx].note >= 0) {
-                let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-                let seq = g.getSequence(e.sequenceId);
-                seq[hitIx] = e.seq[g.currentBeatIx];
-                // TODO BLAGH
-                if (e.sequenceId.type !== SequenceType.SYNTH || e.sequenceId.ix !== 2) {
-                    e.alive = false;
+            if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
+                let hitIx = -1;
+                if (fracAheadOfCurrent < 0.5) {
+                    hitIx = g.currentBeatIx;
+                } else {
+                    hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
+                }
+                if (e.seq[hitIx].note >= 0) {
+                    let seq = g.getSequence(e.sequenceId);
+                    seq[hitIx] = e.seq[hitIx];
+                    // TODO do this cleaner please
+                    if (hitIx === g.currentBeatIx && !newBeat) {
+                        switch (e.sequenceId.type) {
+                            case SequenceType.SYNTH: {
+                                synthPlayVoice(
+                                    g.sound.synths[e.sequenceId.ix], 0, seq[hitIx].note,
+                                    seq[hitIx].sustain, g.sound.audioCtx);
+                                break;
+                            }
+                            case SequenceType.SAMPLE: {
+                                playSoundFromBuffer(
+                                    g.sound.audioCtx, g.sound.drumSounds[e.sequenceId.ix]);
+                                break;
+                            }
+                        }
+                    }
+                    // TODO BLAGH
+                    if (e.sequenceId.type !== SequenceType.SYNTH || e.sequenceId.ix !== 2) {
+                        e.alive = false;
+                        // wtf. linearRampToValueAtTime() starts from the *previous event* time,
+                        // not the current time. bizarre.
+                        g.sound.droneFilter.frequency.setValueAtTime(
+                            g.sound.droneFilter.frequency.value, g.sound.audioCtx.currentTime);
+                        let newVal = g.sound.droneFilter.frequency.value + 200;
+                        g.sound.droneFilter.frequency.linearRampToValueAtTime(
+                            newVal, g.sound.audioCtx.currentTime + 1.0);
+                    }
+                } else {
+                    // AGAIN, do this cleaner pls.
+                    if (hitIx === g.currentBeatIx && !newBeat) {
+                        playSoundFromBuffer(
+                            g.sound.audioCtx, g.sound.drumSounds[2]);
+                    } else {
+                        // Get dat cowbell seq
+                        let seq = g.getSequence(new SequenceId(SequenceType.SAMPLE, 2));
+                        seq[hitIx].note = 0;
+                    }
                 }
             }
         }
@@ -284,6 +332,10 @@ function update(g, timeMillis) {
         for (let i = 0; i < g.sampleSequences.length; ++i) {
             if (g.sampleSequences[i][g.currentBeatIx].note >= 0) {
                 playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i])
+                // TODOOOOOOOO. This clears out the block-cowbells.
+                if (i === 2) {
+                    g.sampleSequences[i][g.currentBeatIx].note = -1;
+                }
             }
         }
     }
@@ -359,6 +411,7 @@ function update(g, timeMillis) {
 
     // Draw Enemies
     g.canvasCtx.strokeStyle = 'white';
+    g.canvasCtx.lineWidth = 2;
     for (i = 0; i < g.enemies.length; ++i) {
         let e = g.enemies[i];
         if (!e.alive) {
@@ -371,12 +424,15 @@ function update(g, timeMillis) {
             posPx.x - 0.5*sizePx,
             posPx.y - 0.5*sizePx,
             sizePx, sizePx);
-        if (e.seq[g.currentBeatIx] < 0) {
-            // draw a barrier
-            g.canvasCtx.strokeRect(
-                posPx.x - 0.6*sizePx,
-                posPx.y - 0.6*sizePx,
-                1.2*sizePx, 1.2*sizePx);
+        if (e.seq[g.currentBeatIx].note < 0) {
+            // draw a barrier. First we draw some transparent "glass" and
+            // then we draw an image of glassy glare on top.
+            g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
+            g.canvasCtx.fillRect(
+                posPx.x - 0.7*sizePx,
+                posPx.y - 0.7*sizePx,
+                1.4*sizePx, 1.4*sizePx);
+            g.canvasCtx.drawImage(g.barrierImg, 0, 0, 16, 16, posPx.x - 0.7*sizePx, posPx.y - 0.7*sizePx, 1.4*sizePx, 1.4*sizePx);
         }
         let isAClosestEnemy = false;
         for (let j = 0; j < nearestEnemies.length; ++j) {
@@ -460,12 +516,20 @@ async function main() {
     let pixelsPerUnit = 50;
 
     let tileSet = await loadTileSet('dungeon_simple', pixelsPerUnit);
-    let tileMapInfo = await loadTileMap('level1');
-    // let tileMapInfo = await loadTileMap('one_room_16x12');
+    // let tileMapInfo = await loadTileMap('level1');
+    let tileMapInfo = await loadTileMap('one_room_16x12');
+
+    let barrierImg = new Image();
+    const waitForImgLoad = () =>
+        new Promise((resolve) => {
+            barrierImg.addEventListener('load', () => resolve(), {once: true});
+        });
+    barrierImg.src = 'glass-glare-16x16.png';
+    await waitForImgLoad();
 
     let canvas = document.getElementById('canvas');
     
-    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo);
+    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg);
 
     window.requestAnimationFrame((t) => update(gameState, t));
 }

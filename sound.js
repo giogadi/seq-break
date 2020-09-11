@@ -117,7 +117,7 @@ function initSynth(audioCtx, synthSpec) {
 
 function initSound() {
     // let soundNames = ['kick', 'snare'];
-    let soundNames = ['kick', 'hihat'];
+    let soundNames = ['kick', 'hihat', 'cowbell', 'drone'];
     let sounds = soundNames.map(function(soundName) {
         return getSoundData(soundName + '.wav')
     });
@@ -169,12 +169,35 @@ function initSound() {
             synths.push(initSynth(audioCtx, synthSpecs[i]));
             auxSynths.push(initSynth(audioCtx, synthSpecs[i]));
         }
+
+        // drone sound
+        let droneSource = audioCtx.createBufferSource();
+        droneSource.buffer = decodedSounds[3];
+        droneSource.loop = true;
+        droneSource.loopStart = 1.0;
+        // SUPER weird: for some reason we *need* to set loopEnd for the sample to loop correctly
+        // (even though the sample length is exactly this length).
+        droneSource.loopEnd = 4.0
+        let droneFilter = audioCtx.createBiquadFilter();
+        droneFilter.type = 'lowpass';
+        // droneFilter.frequency.setValueAtTime(100, audioCtx.currentTime);
+        droneFilter.frequency.value = 100.0;
+        let droneGain = audioCtx.createGain();
+        droneGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        droneSource.connect(droneFilter);
+        droneFilter.connect(droneGain);
+        droneGain.connect(audioCtx.destination);
+        droneSource.start(0);
+
         // TODO BLAH
         synths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
         auxSynths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
         return {
             audioCtx: audioCtx,
             drumSounds: decodedSounds,
+            droneNode: droneSource,
+            droneFilter: droneFilter,
+            droneGain: droneGain,
             synths: synths,
             auxSynths: auxSynths
         }
