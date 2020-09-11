@@ -75,14 +75,14 @@ class GameState {
 
         this.prevTimeMillis = -1.0;
 
-        this.roomLogics = [];
+        this.taskList = [];
         for (let i = 0; i < this.tileMapInfo.rooms.length; ++i) {
-            this.roomLogics.push(new KillAllEnemiesRoomLogic(this, this.tileMapInfo.rooms[i]));
+            lockRoomWithRandomEnemiesTask(this.taskList, this.tileMapInfo.rooms[i]);
         }
 
         // TODO THIS SUCKS AND IS BUSTED
-        if (this.roomLogics.length === 0) {
-            this.roomLogics.push(new OneRoomScript(this, this.NUM_BEATS));
+        if (this.taskList.length === 0) {
+            this.taskList = defaultTaskList(this);
         }
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -177,8 +177,16 @@ function update(g, timeMillis) {
         }
     }
 
-    for (let roomIx = 0; roomIx < g.roomLogics.length; ++roomIx) {
-        g.roomLogics[roomIx].update();
+    let needNewTask = true;
+    while (g.taskList.length > 0 && needNewTask) {
+        needNewTask = g.taskList[0].update(g);
+        if (needNewTask) {
+            console.log("Finished task: " + g.taskList[0].constructor.name);
+            g.taskList.shift();
+            if (g.taskList.length > 0) {
+                console.log("New task: " + g.taskList[0].constructor.name);
+            }
+        }
     }
 
     // Handle slash
@@ -242,13 +250,6 @@ function update(g, timeMillis) {
                     // TODO BLAGH
                     if (e.sequenceId.type !== SequenceType.SYNTH || e.sequenceId.ix !== 2) {
                         e.alive = false;
-                        // wtf. linearRampToValueAtTime() starts from the *previous event* time,
-                        // not the current time. bizarre.
-                        g.sound.droneFilter.frequency.setValueAtTime(
-                            g.sound.droneFilter.frequency.value, g.sound.audioCtx.currentTime);
-                        let newVal = g.sound.droneFilter.frequency.value + 200;
-                        g.sound.droneFilter.frequency.linearRampToValueAtTime(
-                            newVal, g.sound.audioCtx.currentTime + 1.0);
                     }
                 } else {
                     // AGAIN, do this cleaner pls.
