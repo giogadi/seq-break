@@ -104,25 +104,25 @@ class SpawnKickWave extends GameTask {
             let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
             sequence[0].note = 0;
             let p = { x: 4.0, y: 3.0 };
-            gameState.enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+            gameState.spawnEnemy(new Enemy(p, enemySize, sequence, seqId, 'purple'));
         }
         {
             let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
             sequence[4].note = 0;
             let p = { x: 12.0, y: 3.0 };
-            gameState.enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+            gameState.spawnEnemy(new Enemy(p, enemySize, sequence, seqId, 'purple'));
         }
         {
             let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
             sequence[8].note = 0;
             let p = { x: 12.0, y: 9.0 };
-            gameState.enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+            gameState.spawnEnemy(new Enemy(p, enemySize, sequence, seqId, 'purple'));
         }
         {
             let sequence = Array.from({length: 16}, e => { return { note: -1, sustain: false } });
             sequence[12].note = 0;
             let p = { x: 4.0, y: 9.0 };
-            gameState.enemies.push(new Enemy(p, enemySize, sequence, seqId, 'purple'));
+            gameState.spawnEnemy(new Enemy(p, enemySize, sequence, seqId, 'purple'));
         }
         return true;
     }
@@ -139,28 +139,28 @@ class StationaryShooterWave extends GameTask {
             let sequence = Array.from({length: 16}, e => { return { note: randomNote, sustain: false } });
             sequence[0].note = 0;
             let p = { x: 4.0, y: 3.0 };
-            gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -1));
+            gameState.spawnEnemy(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -1));
         }
         {
             let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
             let sequence = Array.from({length: 16}, e => { return { note: randomNote, sustain: false } });
             sequence[4].note = 0;
             let p = { x: 12.0, y: 3.0 };
-            gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -2));
+            gameState.spawnEnemy(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -2));
         }
         {
             let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
             let sequence = Array.from({length: 16}, e => { return { note: randomNote, sustain: false } });
             sequence[8].note = 0;
             let p = { x: 12.0, y: 9.0 };
-            gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -3));
+            gameState.spawnEnemy(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -3));
         }
         {
             let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
             let sequence = Array.from({length: 16}, e => { return { note: randomNote, sustain: false } });
             sequence[12].note = 0;
             let p = { x: 4.0, y: 9.0 };
-            gameState.enemies.push(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -4));
+            gameState.spawnEnemy(makeStationaryShooter(p, enemySize, sequence, seqId, 'orange', -4));
         }
         return true;
     }
@@ -168,9 +168,9 @@ class StationaryShooterWave extends GameTask {
 
 function defaultTaskList(gameState) {
     let taskList = [];
-    taskList.push(new SpawnKickWave());
-    taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
-    taskList.push(new WaitForLoopStart());
+    // taskList.push(new SpawnKickWave());
+    // taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
+    // taskList.push(new WaitForLoopStart());
     taskList.push(new StationaryShooterWave())
     return taskList;
 }

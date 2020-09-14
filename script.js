@@ -61,11 +61,10 @@ class GameState {
         this.currentBeatIx = -1;
         this.newBeat = false;
 
+        this.NUM_ENEMIES = 40;
         this.enemies = [];
-        const NUM_BULLETS = 20;
-        this.bullets = [];
-        for (let i = 0; i < NUM_BULLETS; ++i) {
-            this.bullets.push(makeDeadEnemy());
+        for (let i = 0; i < this.NUM_ENEMIES; ++i) {
+            this.enemies.push(makeDeadEnemy());
         }
 
         this.controlDir = { x: 0.0, y: 0.0 };
@@ -129,6 +128,17 @@ class GameState {
                 return this.sampleSequences[sequenceId.ix];
             }
         }
+    }
+    spawnEnemy(enemy) {
+        for (let i = 0; i < this.enemies.length; ++i) {
+            let e = this.enemies[i];
+            if (e.alive) {
+                continue;
+            }
+            this.enemies[i] = enemy;
+            return;
+        }
+        console.log("ran out of enemies");
     }
 }
 
@@ -210,14 +220,8 @@ function update(g, timeMillis) {
         let frontRight = vecAdd(g.playerPos, vecAdd(front, right));
         hitBox = [frontLeft, backLeft, backRight, frontRight];
 
-        // TODO what a hack
-        for (let i = 0; i < g.enemies.length + g.bullets.length; ++i) {
-            let e = null;
-            if (i < g.enemies.length) {
-                e = g.enemies[i];
-            } else {
-                e = g.bullets[i - g.enemies.length];
-            }
+        for (let i = 0; i < g.enemies.length; ++i) {
+            let e = g.enemies[i];
             let s = 0.5 * e.sideLength;
             let enemyHitBox = [
                 vecAdd(e.pos, { x: -s, y: s }),
@@ -345,12 +349,7 @@ function update(g, timeMillis) {
         if (!g.enemies[eIx].alive) {
             continue;
         }
-        g.enemies[eIx].update(dt, g.newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets, g.playerPos);
-    }
-
-    // Bullet update
-    for (let bIx = 0; bIx < g.bullets.length; ++bIx) {
-        g.bullets[bIx].update(dt, g.newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets, g.playerPos);
+        g.enemies[eIx].update(dt, g);
     }
 
     g.canvasCtx.fillStyle = 'grey';
@@ -475,18 +474,6 @@ function update(g, timeMillis) {
             g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
         }
         g.canvasCtx.stroke();
-    }
-
-    // Draw bullets
-    for (let bIx = 0; bIx < g.bullets.length; ++bIx) {
-        let b = g.bullets[bIx];
-        if (!b.alive) {
-            continue;
-        }
-        g.canvasCtx.fillStyle = b.color;
-        let posPx = vecScale(b.pos, g.pixelsPerUnit);
-        let sizePx = b.sideLength * g.pixelsPerUnit;
-        g.canvasCtx.fillRect(posPx.x - 0.5*sizePx, posPx.y - 0.5*sizePx, sizePx, sizePx);
     }
 
     g.canvasCtx.restore();

@@ -12,16 +12,16 @@ function aabbCollidesWithSomeEnemy(center, sideLength, enemies, ignoredEnemy = n
 }
 
 class Enemy {
-    constructor(pos, sideLength, seq, sequenceId, color, renderLayer) {
+    constructor(pos, sideLength, seq, sequenceId, color, renderLayer = 0) {
         this.pos = pos;
         this.sideLength = sideLength;
         this.seq = seq;
         this.sequenceId = sequenceId;
         this.color = color;
-        this.renderLayer = 0;
+        this.renderLayer = renderLayer;
         this.alive = true;
     }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {}
+    update(dt, gameState) {}
 }
 
 function makeDeadEnemy() {
@@ -32,14 +32,14 @@ function makeDeadEnemy() {
 
 class RhythmEnemyLogic {
     constructor() {}
-    update(rhythmEnemy, bullets) {}
+    update(rhythmEnemy, gameState) {}
 }
 class RhythmEnemySetVelocity extends RhythmEnemyLogic {
     constructor(v) {
         super();
         this.v = v;
     }
-    update(rhythmEnemy, bullets) {
+    update(rhythmEnemy, g) {
         rhythmEnemy.v = this.v;
     }
 }
@@ -48,7 +48,7 @@ class RhythmEnemyRandomDirection extends RhythmEnemyLogic {
         super();
         this.speed = speed;
     }
-    update(rhythmEnemy, bullets) {
+    update(rhythmEnemy, g) {
         let a = Math.random() * 2 * Math.PI;
         rhythmEnemy.v = { x: this.speed*Math.cos(a), y: this.speed*Math.sin(a) };
     }
@@ -57,15 +57,11 @@ class RhythmEnemyShootHoming extends RhythmEnemyLogic {
     constructor() {
         super();
     }
-    update(rhythmEnemy, bullets) {
-        for (let bIx = 0; bIx < bullets.length; ++bIx) {
-            if (bullets[bIx].alive) {
-                continue;
-            }
-            let p = rhythmEnemy.pos;
-            bullets[bIx] = new HomingBullet(rhythmEnemy.pos, 0.2*rhythmEnemy.sideLength);
-            break;
-        }
+    // TODO: now that bullets and enemies are all in the same "queue", we need to make sure
+    // that spawned bullets get updated on the same iteration they get spawned. This won't
+    // happen currently.
+    update(rhythmEnemy, g) {
+        g.spawnEnemy(new HomingBullet(rhythmEnemy.pos, 0.2*rhythmEnemy.sideLength));
     }
 }
 
@@ -78,20 +74,20 @@ class RhythmEnemy extends Enemy {
         this.v = { x: 0.0, y: 0.0 };
         this.currentBeatIx = initBeatIx;
     }
-    update(dt, isNewBeat, unusedCurrentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {
-        if (isNewBeat) {
+    update(dt, g) {
+        if (g.newBeat) {
             ++this.currentBeatIx;
             if (this.currentBeatIx >= 0) {
                 this.currentBeatIx = this.currentBeatIx % this.logicSeq.length;
                 let logic = this.logicSeq[this.currentBeatIx];
                 for (let actionIx = 0; actionIx < logic.length; ++actionIx) {
-                    logic[actionIx].update(this, bullets);
+                    logic[actionIx].update(this, g);
                 }
             }
         }
         let newPos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(newPos, this.sideLength, tileMapInfo, tileSet) ||
-            aabbCollidesWithSomeEnemy(newPos, this.sideLength, enemies, this)) {
+        if (isBoxInCollisionWithMap(newPos, this.sideLength, g.tileMapInfo, g.tileSet) ||
+            aabbCollidesWithSomeEnemy(newPos, this.sideLength, g.enemies, this)) {
             this.v = vecScale(this.v, -1.0);
         } else {
             this.pos = newPos;
@@ -110,25 +106,25 @@ class HomingBullet extends Enemy {
         this.STOP_BEATS = this.BEATS_PER_LOOP - 1
         this.v = { x: 0.0, y: 0.0 };
     }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {
+    update(dt, g) {
         if (!this.alive) {
             return;
         }
-        if (isNewBeat) {
+        if (g.newBeat) {
             ++this.beatsSinceLastChange;
             if (this.beatsSinceLastChange >= this.BEATS_PER_LOOP) {
                 this.v = { x: 0.0, y: 0.0 };
                 // This puts the enemy in sync with the down beats if the enemy was spawned on an offbeat.
-                if (currentBeatIx % 4 === 0) {
+                if (g.currentBeatIx % 4 === 0) {
                     this.beatsSinceLastChange = 0;
                 }
             } else if (this.beatsSinceLastChange == this.STOP_BEATS) {
-                let dir = vecNormalized(vecAdd(playerPos, vecScale(this.pos, -1.0)));
+                let dir = vecNormalized(vecAdd(g.playerPos, vecScale(this.pos, -1.0)));
                 this.v = vecScale(dir, this.SPEED);
             }
         }
         this.pos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(this.pos, this.sideLength, tileMapInfo, tileSet)) {
+        if (isBoxInCollisionWithMap(this.pos, this.sideLength, g.tileMapInfo, g.tileSet)) {
             this.alive = false;
         }
     }
