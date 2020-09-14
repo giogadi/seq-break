@@ -48,7 +48,6 @@ class GameState {
                 this.sampleSequences[i][j] = { note: -1, sustain: false };
             }
         }
-        this.sampleSequences[0][0].note = this.sampleSequences[0][4].note = this.sampleSequences[0][8].note = this.sampleSequences[0][12].note = 0;
 
         this.synthSequences = new Array(this.NUM_SYNTHS);
         for (let i = 0; i < this.NUM_SYNTHS; ++i) {
@@ -60,12 +59,13 @@ class GameState {
 
         this.loopElapsedTime = 0.0;
         this.currentBeatIx = -1;
+        this.newBeat = false;
 
         this.enemies = [];
         const NUM_BULLETS = 20;
         this.bullets = [];
         for (let i = 0; i < NUM_BULLETS; ++i) {
-            this.bullets.push(new Bullet({ x: 0, y: 0 }, 0, false));
+            this.bullets.push(makeDeadEnemy());
         }
 
         this.controlDir = { x: 0.0, y: 0.0 };
@@ -83,6 +83,8 @@ class GameState {
         // TODO THIS SUCKS AND IS BUSTED
         if (this.taskList.length === 0) {
             this.taskList = defaultTaskList(this);
+        } else {
+            this.sampleSequences[0][0].note = this.sampleSequences[0][4].note = this.sampleSequences[0][8].note = this.sampleSequences[0][12].note = 0;
         }
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -164,7 +166,7 @@ function update(g, timeMillis) {
         g.loopElapsedTime = 0.0;
     }
 
-    let newBeat = false;
+    g.newBeat = false;
     let fracAheadOfCurrent = -1;
     {
         let currentBeatContinuous = (g.loopElapsedTime / g.LOOP_TIME) * g.NUM_BEATS;
@@ -172,14 +174,14 @@ function update(g, timeMillis) {
         fracAheadOfCurrent = currentBeatContinuous - newBeatIx;
         console.assert(newBeatIx < g.NUM_BEATS);
         if (newBeatIx !== g.currentBeatIx) {
-            newBeat = true;
+            g.newBeat = true;
             g.currentBeatIx = newBeatIx;
         }
     }
 
     let needNewTask = true;
     while (g.taskList.length > 0 && needNewTask) {
-        needNewTask = g.taskList[0].update(g);
+        needNewTask = g.taskList[0].update(g, dt);
         if (needNewTask) {
             console.log("Finished task: " + g.taskList[0].constructor.name);
             g.taskList.shift();
@@ -208,8 +210,14 @@ function update(g, timeMillis) {
         let frontRight = vecAdd(g.playerPos, vecAdd(front, right));
         hitBox = [frontLeft, backLeft, backRight, frontRight];
 
-        for (let i = 0; i < g.enemies.length; ++i) {
-            let e = g.enemies[i];
+        // TODO what a hack
+        for (let i = 0; i < g.enemies.length + g.bullets.length; ++i) {
+            let e = null;
+            if (i < g.enemies.length) {
+                e = g.enemies[i];
+            } else {
+                e = g.bullets[i - g.enemies.length];
+            }
             let s = 0.5 * e.sideLength;
             let enemyHitBox = [
                 vecAdd(e.pos, { x: -s, y: s }),
@@ -222,17 +230,17 @@ function update(g, timeMillis) {
                 continue;
             }
             if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
+                let seq = g.getSequence(e.sequenceId);
                 let hitIx = -1;
-                if (fracAheadOfCurrent < 0.5) {
+                if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].note >= 0 && seq[g.currentBeatIx].note >= 0) {
                     hitIx = g.currentBeatIx;
                 } else {
                     hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
                 }
                 if (e.seq[hitIx].note >= 0) {
-                    let seq = g.getSequence(e.sequenceId);
                     seq[hitIx] = e.seq[hitIx];
                     // TODO do this cleaner please
-                    if (hitIx === g.currentBeatIx && !newBeat) {
+                    if (hitIx === g.currentBeatIx && !g.newBeat) {
                         switch (e.sequenceId.type) {
                             case SequenceType.SYNTH: {
                                 synthPlayVoice(
@@ -253,7 +261,7 @@ function update(g, timeMillis) {
                     }
                 } else {
                     // AGAIN, do this cleaner pls.
-                    if (hitIx === g.currentBeatIx && !newBeat) {
+                    if (hitIx === g.currentBeatIx && !g.newBeat) {
                         playSoundFromBuffer(
                             g.sound.audioCtx, g.sound.drumSounds[2]);
                     } else {
@@ -263,28 +271,6 @@ function update(g, timeMillis) {
                     }
                 }
             }
-        }
-        let playSnare = false;
-        for (let i = 0; i < g.bullets.length; ++i) {
-            let b = g.bullets[i];
-            let s = 0.5 * b.sideLength;
-            let bulletHitBox = [
-                vecAdd(b.pos, { x: -s, y: s }),
-                vecAdd(b.pos, { x: -s, y: -s }),
-                vecAdd(b.pos, { x: s, y: -s }),
-                vecAdd(b.pos, { x: s, y: s })
-            ];
-            if (!b.alive) {
-                continue;
-            }
-            if (doConvexPolygonsOverlap(hitBox, bulletHitBox)) {
-                playSnare = true;
-                b.alive = false;
-            }
-        }
-        if (playSnare) {
-            let hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-            g.sampleSequences[1][hitIx].note = 0;
         }
     }
 
@@ -306,7 +292,7 @@ function update(g, timeMillis) {
         }
     }
 
-    if (newBeat) {
+    if (g.newBeat) {
         for (let i = 0; i < g.NUM_SYNTHS; ++i) {
             if (g.synthSequences[i][g.currentBeatIx].note >= 0) {
                 synthPlayVoice(
@@ -359,12 +345,12 @@ function update(g, timeMillis) {
         if (!g.enemies[eIx].alive) {
             continue;
         }
-        g.enemies[eIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets);
+        g.enemies[eIx].update(dt, g.newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets, g.playerPos);
     }
 
     // Bullet update
     for (let bIx = 0; bIx < g.bullets.length; ++bIx) {
-        g.bullets[bIx].update(dt, newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.playerPos);
+        g.bullets[bIx].update(dt, g.newBeat, g.currentBeatIx, g.tileMapInfo, g.tileSet, g.enemies, g.bullets, g.playerPos);
     }
 
     g.canvasCtx.fillStyle = 'grey';
@@ -413,53 +399,65 @@ function update(g, timeMillis) {
     // Draw Enemies
     g.canvasCtx.strokeStyle = 'white';
     g.canvasCtx.lineWidth = 2;
-    for (i = 0; i < g.enemies.length; ++i) {
-        let e = g.enemies[i];
-        if (!e.alive) {
-            continue;
-        }
-        let posPx = vecScale(e.pos, g.pixelsPerUnit);
-        let sizePx = e.sideLength * g.pixelsPerUnit;
-        g.canvasCtx.fillStyle = e.color;
-        g.canvasCtx.fillRect(
-            posPx.x - 0.5*sizePx,
-            posPx.y - 0.5*sizePx,
-            sizePx, sizePx);
-        if (e.seq[g.currentBeatIx].note < 0) {
-            // draw a barrier. First we draw some transparent "glass" and
-            // then we draw an image of glassy glare on top.
-            g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
+    let currentRenderLayer = -1;
+    let nextRenderLayer = 0;
+    while (currentRenderLayer !== nextRenderLayer) {
+        currentRenderLayer = nextRenderLayer;
+        for (i = 0; i < g.enemies.length; ++i) {
+            let e = g.enemies[i];
+            if (!e.alive) {
+                continue;
+            }
+            if (e.renderLayer > currentRenderLayer) {
+                if (nextRenderLayer === currentRenderLayer || e.renderLayer < nextRenderLayer) {
+                    nextRenderLayer = e.renderLayer;
+                }
+                continue;
+            }
+
+            let posPx = vecScale(e.pos, g.pixelsPerUnit);
+            let sizePx = e.sideLength * g.pixelsPerUnit;
+            g.canvasCtx.fillStyle = e.color;
             g.canvasCtx.fillRect(
-                posPx.x - 0.7*sizePx,
-                posPx.y - 0.7*sizePx,
-                1.4*sizePx, 1.4*sizePx);
-            g.canvasCtx.drawImage(g.barrierImg, 0, 0, 16, 16, posPx.x - 0.7*sizePx, posPx.y - 0.7*sizePx, 1.4*sizePx, 1.4*sizePx);
-        }
-        let isAClosestEnemy = false;
-        for (let j = 0; j < nearestEnemies.length; ++j) {
-            if (nearestEnemies[j] == i) {
-                isAClosestEnemy = true;
+                posPx.x - 0.5*sizePx,
+                posPx.y - 0.5*sizePx,
+                sizePx, sizePx);
+            if (e.seq[g.currentBeatIx].note < 0) {
+                // draw a barrier. First we draw some transparent "glass" and
+                // then we draw an image of glassy glare on top.
+                g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
+                g.canvasCtx.fillRect(
+                    posPx.x - 0.7*sizePx,
+                    posPx.y - 0.7*sizePx,
+                    1.4*sizePx, 1.4*sizePx);
+                g.canvasCtx.drawImage(g.barrierImg, 0, 0, 16, 16, posPx.x - 0.7*sizePx, posPx.y - 0.7*sizePx, 1.4*sizePx, 1.4*sizePx);
             }
-        }
-        if (isAClosestEnemy) {
-            g.canvasCtx.fillStyle = 'black';
-            g.canvasCtx.fillRect(
-                posPx.x - 0.05*sizePx,
-                posPx.y - 0.05*sizePx,
-                0.1*sizePx, 0.1*sizePx);
-        }
-        if (g.slashPressed) {
-            let hb = enemyHitBoxes[i];
-            let hbPx = [];
-            for (let j = 0; j < hb.length; ++j) {
-                hbPx.push(vecScale(hb[j], g.pixelsPerUnit));
+            let isAClosestEnemy = false;
+            for (let j = 0; j < nearestEnemies.length; ++j) {
+                if (nearestEnemies[j] == i) {
+                    isAClosestEnemy = true;
+                }
             }
-            g.canvasCtx.beginPath();
-            g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
-            for (let j = 0; j < hbPx.length; ++j) {
-                g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
+            if (isAClosestEnemy) {
+                g.canvasCtx.fillStyle = 'black';
+                g.canvasCtx.fillRect(
+                    posPx.x - 0.05*sizePx,
+                    posPx.y - 0.05*sizePx,
+                    0.1*sizePx, 0.1*sizePx);
             }
-            g.canvasCtx.stroke();
+            if (g.slashPressed) {
+                let hb = enemyHitBoxes[i];
+                let hbPx = [];
+                for (let j = 0; j < hb.length; ++j) {
+                    hbPx.push(vecScale(hb[j], g.pixelsPerUnit));
+                }
+                g.canvasCtx.beginPath();
+                g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
+                for (let j = 0; j < hbPx.length; ++j) {
+                    g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
+                }
+                g.canvasCtx.stroke();
+            }
         }
     }
 
@@ -485,7 +483,7 @@ function update(g, timeMillis) {
         if (!b.alive) {
             continue;
         }
-        g.canvasCtx.fillStyle = 'cyan';
+        g.canvasCtx.fillStyle = b.color;
         let posPx = vecScale(b.pos, g.pixelsPerUnit);
         let sizePx = b.sideLength * g.pixelsPerUnit;
         g.canvasCtx.fillRect(posPx.x - 0.5*sizePx, posPx.y - 0.5*sizePx, sizePx, sizePx);

@@ -116,7 +116,6 @@ function initSynth(audioCtx, synthSpec) {
 }
 
 function initSound() {
-    // let soundNames = ['kick', 'snare'];
     let soundNames = ['kick', 'hihat', 'cowbell', 'drone'];
     let sounds = soundNames.map(function(soundName) {
         return getSoundData(soundName + '.wav')
@@ -143,7 +142,7 @@ function initSound() {
             },
             {
                 gain: 1.0,
-                filterCutoff: 9999,
+                filterCutoff: 999,
                 filterModFreq: 0,
                 filterModGain: 0,
                 voiceSpecs: [voiceSpec]
@@ -208,6 +207,8 @@ function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx) {
     let voice = synth.voices[voiceIdx];
     voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
     voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
     if (!sustain) {
         voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);

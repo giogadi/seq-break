@@ -11,74 +11,23 @@ function aabbCollidesWithSomeEnemy(center, sideLength, enemies, ignoredEnemy = n
     return false;
 }
 
-class Bullet {
-    constructor(pos, sideLength, alive = true) {
-        this.pos = pos;
-        this.sideLength = sideLength;
-        this.alive = alive;
-    }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, playerPos) {}
-}
-
-class ConstantBullet extends Bullet {
-    constructor(pos, sideLength, v, alive = true) {
-        super(pos, sideLength, alive);
-        this.v = v;
-    }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, playerPos) {
-        if (!this.alive) {
-            return;
-        }
-        this.pos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(this.pos, this.sideLength, tileMapInfo, tileSet)) {
-            this.alive = false;
-        }
-    }
-}
-
-class HomingBullet extends Bullet {
-    constructor(pos, sideLength) {
-        super(pos, sideLength, true);
-        this.SPEED = 5.0;
-        this.beatsSinceLastChange = -1;
-        this.BEATS_PER_LOOP = 4;
-        this.STOP_BEATS = this.BEATS_PER_LOOP - 1
-        this.v = { x: 0.0, y: 0.0 };
-    }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, playerPos) {
-        if (!this.alive) {
-            return;
-        }
-        if (isNewBeat) {
-            ++this.beatsSinceLastChange;
-            if (this.beatsSinceLastChange >= this.BEATS_PER_LOOP) {
-                this.v = { x: 0.0, y: 0.0 };
-                // This puts the enemy in sync with the down beats if the enemy was spawned on an offbeat.
-                if (currentBeatIx % 4 === 0) {
-                    this.beatsSinceLastChange = 0;
-                }
-            } else if (this.beatsSinceLastChange == this.STOP_BEATS) {
-                let dir = vecNormalized(vecAdd(playerPos, vecScale(this.pos, -1.0)));
-                this.v = vecScale(dir, this.SPEED);
-            }
-        }
-        this.pos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(this.pos, this.sideLength, tileMapInfo, tileSet)) {
-            this.alive = false;
-        }
-    }
-}
-
 class Enemy {
-    constructor(pos, sideLength, seq, sequenceId, color) {
+    constructor(pos, sideLength, seq, sequenceId, color, renderLayer) {
         this.pos = pos;
         this.sideLength = sideLength;
         this.seq = seq;
         this.sequenceId = sequenceId;
         this.color = color;
+        this.renderLayer = 0;
         this.alive = true;
     }
-    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies, bullets) {}
+    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {}
+}
+
+function makeDeadEnemy() {
+    let e = new Enemy({ x: 0.0, y: 0.0 }, 0.0, [], new SequenceId(SequenceType.SYNTH, 0), '', 0);
+    e.alive = false;
+    return e;
 }
 
 class RhythmEnemyLogic {
@@ -124,12 +73,12 @@ class RhythmEnemyShootHoming extends RhythmEnemyLogic {
 // A way to help sync up with another sequence.
 class RhythmEnemy extends Enemy {
     constructor(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx = 0) {
-        super(pos, sideLength, soundSeq, sequenceId, color);
+        super(pos, sideLength, soundSeq, sequenceId, color, 0);
         this.logicSeq = logicSeq;
         this.v = { x: 0.0, y: 0.0 };
         this.currentBeatIx = initBeatIx;
     }
-    update(dt, isNewBeat, unusedCurrentBeatIx, tileMapInfo, tileSet, enemies, bullets) {
+    update(dt, isNewBeat, unusedCurrentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {
         if (isNewBeat) {
             ++this.currentBeatIx;
             if (this.currentBeatIx >= 0) {
@@ -146,6 +95,41 @@ class RhythmEnemy extends Enemy {
             this.v = vecScale(this.v, -1.0);
         } else {
             this.pos = newPos;
+        }
+    }
+}
+
+class HomingBullet extends Enemy {
+    constructor(pos, sideLength) {
+        let sequenceId = new SequenceId(SequenceType.SAMPLE, 1);
+        let seq = new Array(16).fill({ note: 0, sustain: false });
+        super(pos, sideLength, seq, sequenceId, 'cyan', 1);
+        this.SPEED = 5.0;
+        this.beatsSinceLastChange = -1;
+        this.BEATS_PER_LOOP = 4;
+        this.STOP_BEATS = this.BEATS_PER_LOOP - 1
+        this.v = { x: 0.0, y: 0.0 };
+    }
+    update(dt, isNewBeat, currentBeatIx, tileMapInfo, tileSet, enemies, bullets, playerPos) {
+        if (!this.alive) {
+            return;
+        }
+        if (isNewBeat) {
+            ++this.beatsSinceLastChange;
+            if (this.beatsSinceLastChange >= this.BEATS_PER_LOOP) {
+                this.v = { x: 0.0, y: 0.0 };
+                // This puts the enemy in sync with the down beats if the enemy was spawned on an offbeat.
+                if (currentBeatIx % 4 === 0) {
+                    this.beatsSinceLastChange = 0;
+                }
+            } else if (this.beatsSinceLastChange == this.STOP_BEATS) {
+                let dir = vecNormalized(vecAdd(playerPos, vecScale(this.pos, -1.0)));
+                this.v = vecScale(dir, this.SPEED);
+            }
+        }
+        this.pos = vecAdd(this.pos, vecScale(this.v, dt));
+        if (isBoxInCollisionWithMap(this.pos, this.sideLength, tileMapInfo, tileSet)) {
+            this.alive = false;
         }
     }
 }
@@ -169,79 +153,4 @@ function makeMover(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0)
     logicSeq[0].push(new RhythmEnemySetVelocity({ x: 0.0, y: 0.0 }));
     logicSeq[2].push(new RhythmEnemyRandomDirection(3.0));
     return new RhythmEnemy(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx);
-}
-
-function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileMapInfo, tileSet) {
-    console.assert(currentBeatIx >= 0);
-    let enemies = []
-    const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-    // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
-
-    // Delay enemy logic sequences so that they start on a downbeat.
-    let downbeatOffset = currentBeatIx % 4;
-    let delayBeats = 0;
-    // 0 -> 0, 1 -> 3, 2 -> 2, 3 -> 1
-    if (downbeatOffset !== 0) {
-        delayBeats = 4 - downbeatOffset;
-    }
-
-    for (i = 0; i < 10; ++i) {
-        let randPos = { x: 0.0, y: 0.0 };
-        do {
-            randPos = rand2dInBounds(bounds);
-        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
-                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
-
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
-        // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
-        // let sequence = new Array(numBeats).fill(-1);
-        // if (i % 2 == 0) {
-        //     // Down-beats
-        //     for (let j = 0; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // } else {
-        //     // Up-beats
-        //     for (let j = 2; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // }
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: false
-        });
-        let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
-        enemies.push(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
-    }
-    for (i = 0; i < 4; ++i) {
-        let randPos = { x: 0.0, y: 0.0 };
-        do {
-            randPos = rand2dInBounds(bounds);
-        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
-                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
-        let sequence = new Array(numBeats).fill({
-            note: randomNote,
-            sustain: false
-        });
-        let sequenceId = new SequenceId(SequenceType.SYNTH, 1);
-        // Further offset each enemy's logic by 1 downbeat so they don't all shoot at the same time.
-        let delay = delayBeats + 4*i;
-        enemies.push(makeStationaryShooter(randPos, enemySize, sequence, sequenceId, 'darkgoldenrod', -delay));
-    }
-    // for (i = 0; i < numEnemies; ++i) {
-    //     let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 2);
-    //     let sequence = new Array(numBeats).fill({
-    //         note: randomNote,
-    //         sustain: true
-    //     });
-    //     enemies.push({
-    //         pos: rand2dInBounds(bounds),
-    //         seq: sequence,
-    //         synth_ix: 2,
-    //         color: 'purple',
-    //         alive: true
-    //     });
-    // }
-    return enemies;
 }
