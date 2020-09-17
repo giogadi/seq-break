@@ -37,7 +37,7 @@ class GameState {
         this.NUM_BEATS = 16;
         this.LOOP_TIME = this.NUM_BEATS * this.SECONDS_PER_BEAT;
 
-        this.NUM_SYNTHS = 3;
+        this.NUM_SYNTHS = this.sound.synths.length;
 
         // For now, sample sequence elements are interpreted in a binary way
         // (<0 for nothing, else play a note). sustain is ignored.
@@ -286,7 +286,12 @@ function update(g, timeMillis) {
                     g.sound.synths[i], 0, g.synthSequences[i][g.currentBeatIx].note,
                     g.synthSequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
             } else {
-                synthReleaseVoice(g.sound.synths[i], 0, g.sound.audioCtx);
+                // =======================
+                // TODO
+                // =======================
+                // Yo, we crossed this out to allow for longer release times, but now the sustain feature is broken.
+                // Figure out how to make both work in harmony.
+                // synthReleaseVoice(g.sound.synths[i], 0, g.sound.audioCtx);
             }
 
             if (nearestEnemies[i] >= 0) {

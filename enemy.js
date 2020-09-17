@@ -157,7 +157,8 @@ class BigGuy extends Enemy {
         let angleToPlayer = vecCross(headingVec, toPlayerVec);
         let angleSign = (angleToPlayer > 0.0) ? 1.0 : -1.0;
         let maxAngleChange = angularSpeed * dt;
-        if (Math.abs(angleToPlayer) <= maxAngleChange) {
+        if (Math.abs(angleToPlayer) <= maxAngleChange &&
+            vecDot(headingVec, toPlayerVec) > 0.0) {
             this.heading = Math.atan2(toPlayerVec.y, toPlayerVec.x);
         } else {
             this.heading += angleSign * maxAngleChange;

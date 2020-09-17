@@ -168,19 +168,28 @@ class StationaryShooterWave extends GameTask {
 
 class BigGuyWave extends GameTask {
     update(gameState, dt) {
-        let sequence = Array.from({length: 16}, e => { return { note: getFreq(NOTES.A, 3), sustain: false }});
-        let p = { x: 4.0, y: 3.0 };
-        gameState.spawnEnemy(new BigGuy(p, sequence, new SequenceId(SequenceType.SYNTH, 0)));
+        {
+            let sequence = Array.from({length: 16}, e => { return { note: getFreq(NOTES.C, 0), sustain: false }});
+            let p = { x: 4.0, y: 3.0 };
+            gameState.spawnEnemy(new BigGuy(p, sequence, new SequenceId(SequenceType.SYNTH, 3)));
+        }
+
+        {
+            let sequence = Array.from({length: 16}, e => { return { note: getFreq(NOTES.C, 0), sustain: false }});
+            let p = { x: 12.0, y: 9.0 };
+            gameState.spawnEnemy(new BigGuy(p, sequence, new SequenceId(SequenceType.SYNTH, 3)));
+        }
         return true;
     }
 }
 
 function defaultTaskList(gameState) {
     let taskList = [];
-    // taskList.push(new SpawnKickWave());
-    // taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
-    // taskList.push(new WaitForLoopStart());
-    // taskList.push(new StationaryShooterWave())
+    taskList.push(new SpawnKickWave());
+    taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
+    taskList.push(new WaitForLoopStart());
+    taskList.push(new StationaryShooterWave())
+    taskList.push(new WaitUntilAllEnemiesDead());
     taskList.push(new BigGuyWave());
     return taskList;
 }

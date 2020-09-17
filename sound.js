@@ -58,6 +58,7 @@ function initSynth(audioCtx, synthSpec) {
     filterNode = audioCtx.createBiquadFilter();
     filterNode.type = 'lowpass';
     filterNode.frequency.setValueAtTime(synthSpec.filterCutoff, audioCtx.currentTime);
+    filterNode.Q.value = 0.0;
     filterModFreq = audioCtx.createOscillator();
     filterModFreq.frequency.setValueAtTime(synthSpec.filterModFreq, audioCtx.currentTime);
     filterModGain = audioCtx.createGain();
@@ -111,7 +112,9 @@ function initSynth(audioCtx, synthSpec) {
         filter: filterNode,
         filterModFreq: filterModFreq,
         filterModGain: filterModGain,
-        gain: gainNode
+        gain: gainNode,
+        attackTime: synthSpec.attackTime,
+        releaseTime: synthSpec.releaseTime
     };
 }
 
@@ -138,20 +141,27 @@ function initSound() {
                 filterCutoff: 9999,
                 filterModFreq: 0,
                 filterModGain: 0,
-                voiceSpecs: [voiceSpec]
+                voiceSpecs: [voiceSpec],
+                attackTime: 0.01,
+                releaseTime: 0.1
             },
             {
                 gain: 1.0,
                 filterCutoff: 999,
                 filterModFreq: 0,
                 filterModGain: 0,
-                voiceSpecs: [voiceSpec]
+                voiceSpecs: [voiceSpec],
+                attackTime: 0.01,
+                releaseTime: 0.1
             },
             {
+                // Pad
                 gain: 0.25,
                 filterCutoff: 600,
                 filterModFreq: 5,
                 filterModGain: 250,
+                attackTime: 0.01,
+                releaseTime: 0.1,
                 voiceSpecs: [
                     {
                         osc1Type: 'sawtooth',
@@ -159,6 +169,21 @@ function initSound() {
                         osc2Gain: 0.7,
                         osc2Detune: 30
                     }
+                ]
+            },
+            {
+                // Bass
+                gain: 1.0,
+                filterCutoff: 300,
+                filterModFreq: 0,
+                filterModGain: 0,
+                attackTime: 0.01,
+                releaseTime: 0.5,
+                voiceSpecs: [
+                    { osc1Type: 'square',
+                      osc2Type: 'sine',
+                      osc2Gain: 0.0,
+                      osc2Detune: 0.0 }
                 ]
             }
         ];
@@ -187,10 +212,7 @@ function initSound() {
         droneFilter.connect(droneGain);
         droneGain.connect(audioCtx.destination);
         droneSource.start(0);
-
-        // TODO BLAH
-        synths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
-        auxSynths[synthSpecs.length-1].filter.Q.setValueAtTime(10, audioCtx.currentTime);
+        
         return {
             audioCtx: audioCtx,
             drumSounds: decodedSounds,
@@ -209,9 +231,9 @@ function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx) {
     voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
     voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-    voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + 0.01);
+    voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + synth.attackTime);
     if (!sustain) {
-        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 0.1);
+        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
     }
 }
 
