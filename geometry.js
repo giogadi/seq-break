@@ -2,6 +2,10 @@ function vecDot(u, v) {
     return u.x*v.x + u.y*v.y;
 }
 
+function vecCross(u, v) {
+    return u.x*v.y - u.y*v.x;
+}
+
 function vecNorm(v) {
     return Math.sqrt(vecDot(v, v));
 }
@@ -81,4 +85,35 @@ function doAABBsOverlap(center1, sideLength1, center2, sideLength2) {
         return false;
     }
     return true;
+}
+
+function unitVecFromAngle(angle) {
+    return {
+        x: Math.cos(angle),
+        y: Math.sin(angle)
+    };
+}
+
+// headingVec faces in the direction of height. width and height are full (not half)
+function getOOBBCornerPoints(center, headingVec, width, height) {
+    let leftVec = rotate90Ccw(headingVec);
+    let top = vecScale(headingVec, 0.5 * height);
+    let bottom = vecScale(headingVec, -0.5 * height);
+    let left = vecScale(leftVec, 0.5 * width);
+    let right = vecScale(leftVec, -0.5 * width);
+    let topLeft = vecAdd(center, vecAdd(top, left));
+    let bottomLeft = vecAdd(center, vecAdd(bottom, left));
+    let bottomRight = vecAdd(center, vecAdd(bottom, right));
+    let topRight = vecAdd(center, vecAdd(top, right));
+    return [topLeft, bottomLeft, bottomRight, topRight];
+}
+
+// normalizes angles to [0, 2pi]
+// Assumes we're never more than 1 rotation off "normal".
+function normalizeAngle(angle) {
+    if (angle >= 2*Math.PI) {
+        return angle - 2*Math.PI;
+    } else if (angle < 0.0) {
+        return angle + 2*Math.PI;
+    }
 }

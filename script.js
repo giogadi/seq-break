@@ -203,37 +203,20 @@ function update(g, timeMillis) {
 
     // Handle slash
     let hitBox = null;
-    let enemyHitBoxes = [];
+    let enemyHurtBoxes = [];
     if (g.slashPressed || g.sustaining) {
-        let headingVec = {
-            x: Math.cos(g.playerHeading),
-            y: Math.sin(g.playerHeading)
-        };
-        let leftVec = rotate90Ccw(headingVec);
-        let front = vecScale(headingVec, 0.5*g.playerSize + g.playerSize);
-        let back = vecScale(headingVec, 0.5*g.playerSize);
-        let left = vecScale(leftVec, g.playerSize);
-        let right = vecScale(left, -1.0);
-        let frontLeft = vecAdd(g.playerPos, vecAdd(front, left));
-        let backLeft = vecAdd(g.playerPos, vecAdd(back, left));
-        let backRight = vecAdd(g.playerPos, vecAdd(back, right));
-        let frontRight = vecAdd(g.playerPos, vecAdd(front, right));
-        hitBox = [frontLeft, backLeft, backRight, frontRight];
+        let headingVec = unitVecFromAngle(g.playerHeading);
+        let hitBoxCenter = vecAdd(g.playerPos, vecScale(headingVec, g.playerSize));
+        hitBox = getOOBBCornerPoints(hitBoxCenter, headingVec, 2*g.playerSize, g.playerSize);
 
         for (let i = 0; i < g.enemies.length; ++i) {
             let e = g.enemies[i];
-            let s = 0.5 * e.sideLength;
-            let enemyHitBox = [
-                vecAdd(e.pos, { x: -s, y: s }),
-                vecAdd(e.pos, { x: -s, y: -s }),
-                vecAdd(e.pos, { x: s, y: -s }),
-                vecAdd(e.pos, { x: s, y: s })
-            ];
-            enemyHitBoxes.push(enemyHitBox);
+            let enemyHurtBox = e.getHurtBox();
+            enemyHurtBoxes.push(enemyHurtBox);
             if (!e.alive) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHitBox)) {
+            if (doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
                 let seq = g.getSequence(e.sequenceId);
                 let hitIx = -1;
                 if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].note >= 0 && seq[g.currentBeatIx].note >= 0) {
@@ -385,11 +368,9 @@ function update(g, timeMillis) {
     g.canvasCtx.fillStyle = 'red';
     g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
     g.canvasCtx.rotate(g.playerHeading);
-    g.canvasCtx.translate(-playerPosPx.x, -playerPosPx.y);
-    g.canvasCtx.fillRect(playerPosPx.x - 0.5*playerSizePx,
-                         playerPosPx.y - 0.5*playerSizePx,
+    g.canvasCtx.fillRect(-0.5*playerSizePx,
+                         -0.5*playerSizePx,
                          playerSizePx, playerSizePx);
-    g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
     const EYE_SIZE = 0.25*playerSizePx;
     g.canvasCtx.fillStyle = 'black';
     g.canvasCtx.fillRect(0.5*playerSizePx - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
@@ -413,23 +394,25 @@ function update(g, timeMillis) {
                 }
                 continue;
             }
+            g.canvasCtx.save();
 
             let posPx = vecScale(e.pos, g.pixelsPerUnit);
+
+            g.canvasCtx.translate(posPx.x, posPx.y);
+            g.canvasCtx.rotate(e.heading);
+
+            e.draw(g.canvasCtx, g.pixelsPerUnit);
+
             let sizePx = e.sideLength * g.pixelsPerUnit;
-            g.canvasCtx.fillStyle = e.color;
-            g.canvasCtx.fillRect(
-                posPx.x - 0.5*sizePx,
-                posPx.y - 0.5*sizePx,
-                sizePx, sizePx);
             if (e.seq[g.currentBeatIx].note < 0) {
                 // draw a barrier. First we draw some transparent "glass" and
                 // then we draw an image of glassy glare on top.
                 g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
                 g.canvasCtx.fillRect(
-                    posPx.x - 0.7*sizePx,
-                    posPx.y - 0.7*sizePx,
+                    -0.7*sizePx,
+                    -0.7*sizePx,
                     1.4*sizePx, 1.4*sizePx);
-                g.canvasCtx.drawImage(g.barrierImg, 0, 0, 16, 16, posPx.x - 0.7*sizePx, posPx.y - 0.7*sizePx, 1.4*sizePx, 1.4*sizePx);
+                g.canvasCtx.drawImage(g.barrierImg, 0, 0, 16, 16, -0.7*sizePx, -0.7*sizePx, 1.4*sizePx, 1.4*sizePx);
             }
             let isAClosestEnemy = false;
             for (let j = 0; j < nearestEnemies.length; ++j) {
@@ -440,12 +423,16 @@ function update(g, timeMillis) {
             if (isAClosestEnemy) {
                 g.canvasCtx.fillStyle = 'black';
                 g.canvasCtx.fillRect(
-                    posPx.x - 0.05*sizePx,
-                    posPx.y - 0.05*sizePx,
+                    -0.05*sizePx,
+                    -0.05*sizePx,
                     0.1*sizePx, 0.1*sizePx);
             }
+
+            g.canvasCtx.restore();
+
+            // DEBUG
             if (g.slashPressed) {
-                let hb = enemyHitBoxes[i];
+                let hb = enemyHurtBoxes[i];
                 let hbPx = [];
                 for (let j = 0; j < hb.length; ++j) {
                     hbPx.push(vecScale(hb[j], g.pixelsPerUnit));

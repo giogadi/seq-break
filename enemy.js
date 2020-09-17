@@ -14,6 +14,7 @@ function aabbCollidesWithSomeEnemy(center, sideLength, enemies, ignoredEnemy = n
 class Enemy {
     constructor(pos, sideLength, seq, sequenceId, color, renderLayer = 0) {
         this.pos = pos;
+        this.heading = 0.0;
         this.sideLength = sideLength;
         this.seq = seq;
         this.sequenceId = sequenceId;
@@ -22,6 +23,18 @@ class Enemy {
         this.alive = true;
     }
     update(dt, gameState) {}
+    draw(canvasCtx, pixelsPerUnit) {
+        let sizePx = this.sideLength * pixelsPerUnit;
+        canvasCtx.fillStyle = this.color;
+        canvasCtx.fillRect(
+            -0.5*sizePx,
+            -0.5*sizePx,
+            sizePx, sizePx);
+    }
+    getHurtBox() {
+        return getOOBBCornerPoints(
+            this.pos, unitVecFromAngle(this.heading), this.sideLength, this.sideLength);
+    }
 }
 
 function makeDeadEnemy() {
@@ -95,6 +108,7 @@ class RhythmEnemy extends Enemy {
     }
 }
 
+// TODO: make this a RhythmEnemy
 class HomingBullet extends Enemy {
     constructor(pos, sideLength) {
         let sequenceId = new SequenceId(SequenceType.SAMPLE, 1);
@@ -127,6 +141,50 @@ class HomingBullet extends Enemy {
         if (isBoxInCollisionWithMap(this.pos, this.sideLength, g.tileMapInfo, g.tileSet)) {
             this.alive = false;
         }
+    }
+}
+
+class BigGuy extends Enemy {
+    constructor(pos, soundSeq, sequenceId) {
+        super(pos, 1.5, soundSeq, sequenceId, 'black', 0);
+        this.buttSize = 0.2 * this.sideLength;
+    }
+    update(dt, g) {
+        const forwardSpeed = 1.5;
+        const angularSpeed = 0.25 * Math.PI;
+        let headingVec = unitVecFromAngle(this.heading);
+        let toPlayerVec = vecNormalized(vecAdd(g.playerPos, vecScale(this.pos, -1.0)));
+        let angleToPlayer = vecCross(headingVec, toPlayerVec);
+        let angleSign = (angleToPlayer > 0.0) ? 1.0 : -1.0;
+        let maxAngleChange = angularSpeed * dt;
+        if (Math.abs(angleToPlayer) <= maxAngleChange) {
+            this.heading = Math.atan2(toPlayerVec.y, toPlayerVec.x);
+        } else {
+            this.heading += angleSign * maxAngleChange;
+        }
+        headingVec = unitVecFromAngle(this.heading);
+        this.pos = vecAdd(this.pos, vecScale(headingVec, forwardSpeed * dt));
+    }
+    draw(canvasCtx, pixelsPerUnit) {
+        let sizePx = this.sideLength * pixelsPerUnit;
+        canvasCtx.fillStyle = this.color;
+        canvasCtx.fillRect(
+            -0.5*sizePx,
+            -0.5*sizePx,
+            sizePx, sizePx);
+        canvasCtx.fillStyle = 'white';
+        // Butt
+        let buttSizePx = this.buttSize * pixelsPerUnit;
+        canvasCtx.fillRect(
+            -0.5*sizePx,
+            -0.5 * buttSizePx,
+            buttSizePx, buttSizePx);
+    }
+    getHurtBox() {
+        let headingVec = unitVecFromAngle(this.heading);
+        let buttPos = vecAdd(this.pos, vecScale(headingVec, -0.5 * this.sideLength + 0.5 * this.buttSize));
+        return getOOBBCornerPoints(
+            buttPos, unitVecFromAngle(this.heading), this.buttSize, this.buttSize);
     }
 }
 
