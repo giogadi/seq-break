@@ -112,7 +112,7 @@ class RhythmEnemy extends Enemy {
 class HomingBullet extends Enemy {
     constructor(pos, sideLength) {
         let sequenceId = new SequenceId(SequenceType.SAMPLE, 1);
-        let seq = new Array(16).fill({ note: 0, sustain: false });
+        let seq = Array.from({length: 16}, e => { return new SequenceElement(0); });
         super(pos, sideLength, seq, sequenceId, 'cyan', 1);
         this.SPEED = 5.0;
         this.beatsSinceLastChange = -1;
@@ -144,6 +144,7 @@ class HomingBullet extends Enemy {
     }
 }
 
+// TODO: collision detection
 class BigGuy extends Enemy {
     constructor(pos, soundSeq, sequenceId) {
         super(pos, 1.5, soundSeq, sequenceId, 'black', 0);

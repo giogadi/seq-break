@@ -129,30 +129,38 @@ function initSound() {
             return audioCtx.decodeAudioData(loadedSound);
         }));
     }).then(function(decodedSounds) {
-        let voiceSpec = {
-            osc1Type: 'sawtooth',
-            osc2Type: 'sawtooth',
-            osc2Gain: 0.7,
-            osc2Detune: 30 // cents
-        };
         let synthSpecs = [
             {
-                gain: 1.0,
-                filterCutoff: 9999,
+                gain: 0.5,
+                filterCutoff: 800,
                 filterModFreq: 0,
                 filterModGain: 0,
-                voiceSpecs: [voiceSpec],
-                attackTime: 0.01,
-                releaseTime: 0.1
+                attackTime: 0.03,
+                releaseTime: 0.1,
+                voiceSpecs: [
+                    {
+                        osc1Type: 'sawtooth',
+                        osc2Type: 'square',
+                        osc2Gain: 0.25,
+                        osc2Detune: 30
+                    }
+                ]
             },
             {
-                gain: 1.0,
-                filterCutoff: 999,
+                gain: 0.5,
+                filterCutoff: 400,
                 filterModFreq: 0,
                 filterModGain: 0,
-                voiceSpecs: [voiceSpec],
                 attackTime: 0.01,
-                releaseTime: 0.1
+                releaseTime: 0.2,
+                voiceSpecs: [
+                    {
+                        osc1Type: 'sawtooth',
+                        osc2Type: 'sawtooth',
+                        osc2Gain: 0.0,
+                        osc2Detune: 0 // cents
+                    }
+                ]
             },
             {
                 // Pad
@@ -173,7 +181,7 @@ function initSound() {
             },
             {
                 // Bass
-                gain: 1.0,
+                gain: 0.5,
                 filterCutoff: 300,
                 filterModFreq: 0,
                 filterModGain: 0,
@@ -207,15 +215,24 @@ function initSound() {
         // droneFilter.frequency.setValueAtTime(100, audioCtx.currentTime);
         droneFilter.frequency.value = 100.0;
         let droneGain = audioCtx.createGain();
-        droneGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        // droneGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        droneGain.gain.value = 0.0;
         droneSource.connect(droneFilter);
         droneFilter.connect(droneGain);
         droneGain.connect(audioCtx.destination);
         droneSource.start(0);
-        
+
+        let sampleSounds = [];
+        for (let i = 0; i < decodedSounds.length; ++i) {
+            let sampleGainNode = audioCtx.createGain();
+            sampleGainNode.gain.value = 0.5;
+            sampleGainNode.connect(audioCtx.destination);
+            sampleSounds.push({ buffer: decodedSounds[i], gainNode: sampleGainNode });
+        }
+
         return {
             audioCtx: audioCtx,
-            drumSounds: decodedSounds,
+            drumSounds: sampleSounds,
             droneNode: droneSource,
             droneFilter: droneFilter,
             droneGain: droneGain,
@@ -225,13 +242,13 @@ function initSound() {
     });
 }
 
-function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx) {
+function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx, velocity = 1.0) {
     let voice = synth.voices[voiceIdx];
     voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
     voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-    voice.gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime + synth.attackTime);
+    voice.gain.gain.linearRampToValueAtTime(velocity, audioCtx.currentTime + synth.attackTime);
     if (!sustain) {
         voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
     }
@@ -242,9 +259,9 @@ function synthReleaseVoice(synth, voiceIdx, audioCtx) {
     voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
 }
 
-function playSoundFromBuffer(audioCtx, buffer) {
+function playSoundFromBuffer(audioCtx, sampleSound) {
     let source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
+    source.buffer = sampleSound.buffer;
+    source.connect(sampleSound.gainNode);
     source.start(0);
 }

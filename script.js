@@ -10,6 +10,14 @@ class SequenceId {
     }
 }
 
+class SequenceElement {
+    constructor(freq, sustain = false, velocity = 1.0) {
+        this.freq = freq;
+        this.sustain = sustain;
+        this.velocity = velocity;
+    }
+}
+
 class GameState {
     constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg) {
         this.canvas = canvas;
@@ -45,7 +53,7 @@ class GameState {
         for (let i = 0; i < this.sampleSequences.length; ++i) {
             this.sampleSequences[i] = [];
             for (let j = 0; j < this.NUM_BEATS; ++j) {
-                this.sampleSequences[i][j] = { note: -1, sustain: false };
+                this.sampleSequences[i][j] = new SequenceElement(-1);
             }
         }
 
@@ -53,7 +61,7 @@ class GameState {
         for (let i = 0; i < this.NUM_SYNTHS; ++i) {
             this.synthSequences[i] = [];
             for (let j = 0; j < this.NUM_BEATS; ++j) {
-                this.synthSequences[i][j] = { note: -1, sustain: false }
+                this.synthSequences[i][j] = new SequenceElement(-1);
             }
         }
 
@@ -83,7 +91,7 @@ class GameState {
         if (this.taskList.length === 0) {
             this.taskList = defaultTaskList(this);
         } else {
-            this.sampleSequences[0][0].note = this.sampleSequences[0][4].note = this.sampleSequences[0][8].note = this.sampleSequences[0][12].note = 0;
+            this.sampleSequences[0][0].freq = this.sampleSequences[0][4].freq = this.sampleSequences[0][8].freq = this.sampleSequences[0][12].freq = 0;
         }
         
         window.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -219,19 +227,19 @@ function update(g, timeMillis) {
             if (doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
                 let seq = g.getSequence(e.sequenceId);
                 let hitIx = -1;
-                if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].note >= 0 && seq[g.currentBeatIx].note >= 0) {
+                if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].freq >= 0 && seq[g.currentBeatIx].freq >= 0) {
                     hitIx = g.currentBeatIx;
                 } else {
                     hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
                 }
-                if (e.seq[hitIx].note >= 0) {
+                if (e.seq[hitIx].freq >= 0) {
                     seq[hitIx] = e.seq[hitIx];
                     // TODO do this cleaner please
                     if (hitIx === g.currentBeatIx && !g.newBeat) {
                         switch (e.sequenceId.type) {
                             case SequenceType.SYNTH: {
                                 synthPlayVoice(
-                                    g.sound.synths[e.sequenceId.ix], 0, seq[hitIx].note,
+                                    g.sound.synths[e.sequenceId.ix], 0, seq[hitIx].freq,
                                     seq[hitIx].sustain, g.sound.audioCtx);
                                 break;
                             }
@@ -254,7 +262,7 @@ function update(g, timeMillis) {
                     } else {
                         // Get dat cowbell seq
                         let seq = g.getSequence(new SequenceId(SequenceType.SAMPLE, 2));
-                        seq[hitIx].note = 0;
+                        seq[hitIx].freq = 0;
                     }
                 }
             }
@@ -281,9 +289,9 @@ function update(g, timeMillis) {
 
     if (g.newBeat) {
         for (let i = 0; i < g.NUM_SYNTHS; ++i) {
-            if (g.synthSequences[i][g.currentBeatIx].note >= 0) {
+            if (g.synthSequences[i][g.currentBeatIx].freq >= 0) {
                 synthPlayVoice(
-                    g.sound.synths[i], 0, g.synthSequences[i][g.currentBeatIx].note,
+                    g.sound.synths[i], 0, g.synthSequences[i][g.currentBeatIx].freq,
                     g.synthSequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
             } else {
                 // =======================
@@ -296,9 +304,9 @@ function update(g, timeMillis) {
 
             if (nearestEnemies[i] >= 0) {
                 let e = g.enemies[nearestEnemies[i]];
-                if (e.seq[g.currentBeatIx].note >= 0) {
+                if (e.seq[g.currentBeatIx].freq >= 0) {
                     synthPlayVoice(
-                        g.sound.auxSynths[i], 0, e.seq[g.currentBeatIx].note,
+                        g.sound.auxSynths[i], 0, e.seq[g.currentBeatIx].freq,
                         e.seq[g.currentBeatIx].sustain, g.sound.audioCtx);
                 } else {
                     synthReleaseVoice(g.sound.auxSynths[i], 0, g.sound.audioCtx);
@@ -309,11 +317,11 @@ function update(g, timeMillis) {
         }
 
         for (let i = 0; i < g.sampleSequences.length; ++i) {
-            if (g.sampleSequences[i][g.currentBeatIx].note >= 0) {
+            if (g.sampleSequences[i][g.currentBeatIx].freq >= 0) {
                 playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i])
                 // TODOOOOOOOO. This clears out the block-cowbells.
                 if (i === 2) {
-                    g.sampleSequences[i][g.currentBeatIx].note = -1;
+                    g.sampleSequences[i][g.currentBeatIx].freq = -1;
                 }
             }
         }
@@ -409,7 +417,7 @@ function update(g, timeMillis) {
             e.draw(g.canvasCtx, g.pixelsPerUnit);
 
             let sizePx = e.sideLength * g.pixelsPerUnit;
-            if (e.seq[g.currentBeatIx].note < 0) {
+            if (e.seq[g.currentBeatIx].freq < 0) {
                 // draw a barrier. First we draw some transparent "glass" and
                 // then we draw an image of glassy glare on top.
                 g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
