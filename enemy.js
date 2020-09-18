@@ -1,10 +1,10 @@
-function aabbCollidesWithSomeEnemy(center, sideLength, enemies, ignoredEnemy = null) {
+function aabbCollidesWithSomeEnemy(center, width, height, enemies, ignoredEnemy = null) {
     for (let eIx = 0; eIx < enemies.length; ++eIx) {
         let e = enemies[eIx];
         if (!e.alive || e === ignoredEnemy) {
             continue;
         }
-        if (doAABBsOverlap(center, sideLength, e.pos, e.sideLength)) {
+        if (doAABBsOverlap(center, width, height, e.pos, e.sideLength, e.sideLength)) {
             return true;
         }
     }
@@ -99,8 +99,8 @@ class RhythmEnemy extends Enemy {
             }
         }
         let newPos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(newPos, this.sideLength, g.tileMapInfo, g.tileSet) ||
-            aabbCollidesWithSomeEnemy(newPos, this.sideLength, g.enemies, this)) {
+        if (isBoxInCollisionWithMap(newPos, this.sideLength, this.sideLength, g.tileMapInfo, g.tileSet) ||
+            aabbCollidesWithSomeEnemy(newPos, this.sideLength, this.sideLength, g.enemies, this)) {
             this.v = vecScale(this.v, -1.0);
         } else {
             this.pos = newPos;
@@ -138,7 +138,7 @@ class HomingBullet extends Enemy {
             }
         }
         this.pos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(this.pos, this.sideLength, g.tileMapInfo, g.tileSet)) {
+        if (isBoxInCollisionWithMap(this.pos, this.sideLength, this.sideLength, g.tileMapInfo, g.tileSet)) {
             this.alive = false;
         }
     }
@@ -152,7 +152,7 @@ class BigGuy extends Enemy {
     }
     update(dt, g) {
         const forwardSpeed = 1.5;
-        const angularSpeed = 0.25 * Math.PI;
+        const angularSpeed = 0.35 * Math.PI;
         let headingVec = unitVecFromAngle(this.heading);
         let toPlayerVec = vecNormalized(vecAdd(g.playerPos, vecScale(this.pos, -1.0)));
         let angleToPlayer = vecCross(headingVec, toPlayerVec);

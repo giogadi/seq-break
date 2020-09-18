@@ -135,16 +135,15 @@ function setTile(tileMapInfo, tileMapCol, tileMapRow, tileSetTileId) {
     tileMapInfo.info.layers[0].data[tileMapIdx] = tileSetTileId;
 }
 
-function isBoxInCollisionWithMap(center, sideLength, tileMapInfo, tileSet) {
+function isBoxInCollisionWithMap(center, width, height, tileMapInfo, tileSet) {
     let tileMap = tileMapInfo.info.layers[0];
-    let halfLength = 0.5 * sideLength;
     let minTileOverlap = {
-        x: Math.max(0, Math.floor(center.x - halfLength)),
-        y: Math.max(0, Math.floor(center.y - halfLength))
+        x: Math.max(0, Math.floor(center.x - 0.5 * width)),
+        y: Math.max(0, Math.floor(center.y - 0.5 * height))
     };
     let maxTileOverlap = {
-        x: Math.min(tileMap.width-1, Math.floor(center.x + halfLength)),
-        y: Math.min(tileMap.height-1, Math.floor(center.y + halfLength))
+        x: Math.min(tileMap.width-1, Math.floor(center.x + 0.5 * width)),
+        y: Math.min(tileMap.height-1, Math.floor(center.y + 0.5 * height))
     };
     for (let col = minTileOverlap.x; col <= maxTileOverlap.x; ++col) {
         for (let row = minTileOverlap.y; row <= maxTileOverlap.y; ++row) {

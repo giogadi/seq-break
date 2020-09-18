@@ -13,11 +13,9 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
     }
 
     for (i = 0; i < 10; ++i) {
-        let randPos = { x: 0.0, y: 0.0 };
-        do {
-            randPos = rand2dInBounds(bounds);
-        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
-                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
+        let randPos = sampleCollisionFreeAABBPos(
+            bounds, enemySize, enemySize, 50, enemies, tileMapInfo, tileSet);
+        console.assert(randPos !== null);
 
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
         // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
@@ -41,11 +39,10 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
         enemies.push(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
     }
     for (i = 0; i < 4; ++i) {
-        let randPos = { x: 0.0, y: 0.0 };
-        do {
-            randPos = rand2dInBounds(bounds);
-        } while (isBoxInCollisionWithMap(randPos, enemySize, tileMapInfo, tileSet) ||
-                 aabbCollidesWithSomeEnemy(randPos, enemySize, enemies));
+        let randPos = sampleCollisionFreeAABBPos(
+            bounds, enemySize, enemySize, 50, enemies, tileMapInfo, tileSet);
+        console.assert(randPos !== null);
+
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
         let sequence = new Array(numBeats);
         for (let j = 0; j < sequence.length; ++j) {
@@ -168,11 +165,9 @@ class MoverWave extends GameTask {
             max: { x: 15.0, y: 9.0 }
         }
         for (let i = 0; i < 10; ++i) {
-            let randPos = { x: 0.0, y: 0.0 };
-            do {
-                randPos = rand2dInBounds(bounds);
-            } while (isBoxInCollisionWithMap(randPos, enemySize, gameState.tileMapInfo, gameState.tileSet) ||
-                     aabbCollidesWithSomeEnemy(randPos, enemySize, gameState.enemies));
+            let randPos = sampleCollisionFreeAABBPos(
+                bounds, enemySize, enemySize, 50, gameState.enemies, gameState.tileMapInfo, gameState.tileSet);
+            console.assert(randPos !== null);
     
             let note = getFreq(possibleNotes[i % possibleNotes.length], 3);
             // let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
@@ -194,22 +189,127 @@ class MoverWave extends GameTask {
                 sequence[j] = new SequenceElement(note);
             }
             let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
-            gameState.enemies.push(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
+            gameState.spawnEnemy(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
         }
+        return true;
+    }
+}
+
+// Returns null if no valid point was found
+function sampleCollisionFreeAABBPos(
+    sampleBounds, boxWidth, boxHeight, maxNumTries, enemies, tileMapInfo = null, tileSet = null) {
+    let checkTileMap = tileMapInfo !== null && tileSet !== null;
+    for (let i = 0; i < maxNumTries; ++i) {
+        let randPos = rand2dInBounds(sampleBounds);
+        if ((!checkTileMap ||
+             !isBoxInCollisionWithMap(randPos, boxWidth, boxHeight, tileMapInfo, tileSet)) &&
+            !aabbCollidesWithSomeEnemy(randPos, boxWidth, boxHeight, enemies)) {
+            return randPos;
+        }
+    }
+    return null;
+}
+
+function getDownBeatDelay(currentBeatIx) {
+    let downbeatOffset = currentBeatIx % 4;
+    let delayBeats = 0;
+    // 0 -> 0, 1 -> 3, 2 -> 2, 3 -> 1
+    if (downbeatOffset !== 0) {
+        delayBeats = 4 - downbeatOffset;
+    }
+    return delayBeats;
+}
+
+class InfiniteWaves extends GameTask {
+    constructor() {
+        super();
+        this.bounds = {
+            min: { x: 0.0, y: 0.0 },
+            max: { x: 15.0, y: 9.0 }
+        };
+    }
+    update(g, dt) {
+        let allEnemiesDead = true;
+        for (let i = 0; i < g.enemies.length; ++i) {
+            if (g.enemies[i].alive) {
+                allEnemiesDead = false;
+                break;
+            }
+        }
+
+        if (allEnemiesDead) {
+            this.makeRandomEnemies(g, this.bounds);
+        }
+        return false;
+    }
+    makeRandomEnemies(g, bounds) {
+        const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+        const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
+
+        // Shooters
+        let numEnemies = Math.random() * 4;
+        let enemySize = 1.0;
+        let seqId = new SequenceId(SequenceType.SYNTH, 1);
+        for (let i = 0; i < numEnemies; ++i) {
+            let randPos = sampleCollisionFreeAABBPos(
+                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+            console.assert(randPos !== null);
+
+            let note = getFreq(possibleNotes[i % possibleNotes.length], 1);
+            let seq = createConstantSequence(16, note);
+            g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -downBeatDelay));
+        }
+
+        // Big guys
+        numEnemies = Math.random() * 2;
+        // TODO: This is actually not being passed to bigguy's constructor, BE CAREFUL
+        enemySize = 1.5;
+        seqId = new SequenceId(SequenceType.SYNTH, 3);
+        for (let i = 0; i < numEnemies; ++i) {
+            let randPos = sampleCollisionFreeAABBPos(
+                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+            console.assert(randPos !== null);
+
+            let note = getFreq(possibleNotes[i % possibleNotes.length], 0);
+            let seq = createConstantSequence(16, note);
+            g.spawnEnemy(new BigGuy(randPos, seq, seqId));
+        }
+
+        // Movers
+        numEnemies = Math.random() * 8;
+        enemySize = 1.0;
+        seqId = new SequenceId(SequenceType.SYNTH, 0);
+        for (let i = 0; i < numEnemies; ++i) {
+            let randPos = sampleCollisionFreeAABBPos(
+                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+            console.assert(randPos !== null);
+
+            let note = getFreq(possibleNotes[i % possibleNotes.length], 3);
+            let seq = createConstantSequence(16, note);
+            g.spawnEnemy(makeMover(randPos, enemySize, seq, seqId, 'green', -downBeatDelay));
+        }
+    }
+}
+
+class SetStandardKickPattern extends GameTask {
+    update(gameState, dt) {
+        gameState.sampleSequences[0][0].freq = gameState.sampleSequences[0][4].freq = gameState.sampleSequences[0][8].freq = gameState.sampleSequences[0][12].freq = 0;
         return true;
     }
 }
 
 function defaultTaskList(gameState) {
     let taskList = [];
-    taskList.push(new SpawnKickWave());
-    taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
-    taskList.push(new WaitForLoopStart());
-    taskList.push(new StationaryShooterWave())
-    taskList.push(new WaitUntilAllEnemiesDead());
-    taskList.push(new BigGuyWave());
-    taskList.push(new WaitUntilAllEnemiesDead());
-    taskList.push(new WaitForLoopStart());
-    taskList.push(new MoverWave());
+    taskList.push(new SetStandardKickPattern());
+    // taskList.push(new SpawnKickWave());
+    // taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
+    // taskList.push(new WaitForLoopStart());
+    // taskList.push(new StationaryShooterWave())
+    // taskList.push(new WaitUntilAllEnemiesDead());
+    // taskList.push(new BigGuyWave());
+    // taskList.push(new WaitUntilAllEnemiesDead());
+    // taskList.push(new WaitForLoopStart());
+    // taskList.push(new MoverWave());
+    taskList.push(new InfiniteWaves());
     return taskList;
 }

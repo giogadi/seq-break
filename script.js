@@ -18,6 +18,14 @@ class SequenceElement {
     }
 }
 
+function createConstantSequence(numBeats, freq) {
+    let sequence = new Array(numBeats);
+    for (let j = 0; j < numBeats; ++j) {
+        sequence[j] = new SequenceElement(freq);
+    }
+    return sequence;
+}
+
 class GameState {
     constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg) {
         this.canvas = canvas;
@@ -334,7 +342,7 @@ function update(g, timeMillis) {
         let oldPos = g.playerPos;
         let newPos = vecAdd(
             g.playerPos, vecScale(vecNormalized(g.controlDir), g.playerSpeed * dt));
-        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.tileMapInfo, g.tileSet)) {
+        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.playerSize, g.tileMapInfo, g.tileSet)) {
             g.playerPos = newPos;
         }
         g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
