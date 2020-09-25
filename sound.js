@@ -131,24 +131,24 @@ function initSound() {
     }).then(function(decodedSounds) {
         let synthSpecs = [
             {
-                gain: 0.5,
-                filterCutoff: 800,
+                gain: 0.25,
+                filterCutoff: 900,
                 filterModFreq: 0,
                 filterModGain: 0,
-                attackTime: 0.03,
-                releaseTime: 0.1,
+                attackTime: 0.01,
+                releaseTime: 0.07,
                 voiceSpecs: [
                     {
-                        osc1Type: 'sawtooth',
-                        osc2Type: 'square',
-                        osc2Gain: 0.25,
-                        osc2Detune: 30
+                        osc1Type: 'square',
+                        osc2Type: 'sawtooth',
+                        osc2Gain: 0.5,
+                        osc2Detune: 50
                     }
                 ]
             },
             {
-                gain: 0.5,
-                filterCutoff: 400,
+                gain: 0.4,
+                filterCutoff: 600,
                 filterModFreq: 0,
                 filterModGain: 0,
                 attackTime: 0.01,
@@ -157,8 +157,8 @@ function initSound() {
                     {
                         osc1Type: 'sawtooth',
                         osc2Type: 'sawtooth',
-                        osc2Gain: 0.0,
-                        osc2Detune: 0 // cents
+                        osc2Gain: 0.5,
+                        osc2Detune: 20 // cents
                     }
                 ]
             },
@@ -185,7 +185,7 @@ function initSound() {
                 filterCutoff: 300,
                 filterModFreq: 0,
                 filterModGain: 0,
-                attackTime: 0.01,
+                attackTime: 0.0,
                 releaseTime: 0.5,
                 voiceSpecs: [
                     { osc1Type: 'square',
@@ -229,6 +229,8 @@ function initSound() {
             sampleGainNode.connect(audioCtx.destination);
             sampleSounds.push({ buffer: decodedSounds[i], gainNode: sampleGainNode });
         }
+        // Set hihat to lower gain
+        sampleSounds[1].gainNode.gain.value = 0.15
 
         return {
             audioCtx: audioCtx,
@@ -259,9 +261,14 @@ function synthReleaseVoice(synth, voiceIdx, audioCtx) {
     voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
 }
 
-function playSoundFromBuffer(audioCtx, sampleSound) {
+function playSoundFromBuffer(audioCtx, sampleSound, velocity = 1.0) {
     let source = audioCtx.createBufferSource();
     source.buffer = sampleSound.buffer;
-    source.connect(sampleSound.gainNode);
+    // Maybe cache this yo
+    let velGain = audioCtx.createGain();
+    velGain.gain.value = velocity;
+    source.connect(velGain);
+    velGain.connect(sampleSound.gainNode);
+    // source.connect(sampleSound.gainNode);
     source.start(0);
 }

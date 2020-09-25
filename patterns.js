@@ -243,20 +243,21 @@ class InfiniteWaves extends GameTask {
         return false;
     }
     makeRandomEnemies(g, bounds) {
-        const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+        let possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
         const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
 
         // Shooters
-        let numEnemies = Math.random() * 4;
+        let numEnemies = Math.floor(Math.random() * 4);
         let enemySize = 1.0;
         let seqId = new SequenceId(SequenceType.SYNTH, 1);
+        let randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
                 bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
-            let note = getFreq(possibleNotes[i % possibleNotes.length], 1);
-            let seq = createConstantSequence(16, note);
+            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 1);
+            let seq = createConstantSequence(16, note, 5);
             g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -downBeatDelay));
         }
 
@@ -265,27 +266,30 @@ class InfiniteWaves extends GameTask {
         // TODO: This is actually not being passed to bigguy's constructor, BE CAREFUL
         enemySize = 1.5;
         seqId = new SequenceId(SequenceType.SYNTH, 3);
+        randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
                 bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
-            let note = getFreq(possibleNotes[i % possibleNotes.length], 0);
-            let seq = createConstantSequence(16, note);
+            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 0);
+            let seq = createConstantSequence(16, note, 5);
             g.spawnEnemy(new BigGuy(randPos, seq, seqId));
         }
 
         // Movers
+        possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
         numEnemies = Math.random() * 8;
         enemySize = 1.0;
         seqId = new SequenceId(SequenceType.SYNTH, 0);
+        randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
                 bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
-            let note = getFreq(possibleNotes[i % possibleNotes.length], 3);
-            let seq = createConstantSequence(16, note);
+            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 2);
+            let seq = createConstantSequence(16, note, 5);
             g.spawnEnemy(makeMover(randPos, enemySize, seq, seqId, 'green', -downBeatDelay));
         }
     }

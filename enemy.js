@@ -112,7 +112,7 @@ class RhythmEnemy extends Enemy {
 class HomingBullet extends Enemy {
     constructor(pos, sideLength) {
         let sequenceId = new SequenceId(SequenceType.SAMPLE, 1);
-        let seq = Array.from({length: 16}, e => { return new SequenceElement(0); });
+        let seq = Array.from({length: 16}, e => { return new SequenceElement(0, false, 3); });
         super(pos, sideLength, seq, sequenceId, 'cyan', 1);
         this.SPEED = 5.0;
         this.beatsSinceLastChange = -1;
@@ -193,7 +193,7 @@ class BigGuy extends Enemy {
 function makeStationaryShooter(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0) {
     // Note: new Array(16).fill([]) doesn't work because that assigns all the elements
     // to the _same_ empty array!
-    let logicSeq = new Array(32);
+    let logicSeq = new Array(16);
     for (let i = 0; i < logicSeq.length; ++i) {
         logicSeq[i] = [];
     }

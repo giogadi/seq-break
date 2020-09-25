@@ -11,17 +11,33 @@ class SequenceId {
 }
 
 class SequenceElement {
-    constructor(freq, sustain = false, velocity = 1.0) {
+    constructor(freq, sustain = false, loopsUntilGone = 0) {
         this.freq = freq;
         this.sustain = sustain;
-        this.velocity = velocity;
+        this.velocity = 1.0;
+        this.velocityDecreasePerLoop = 0.0;
+        if (loopsUntilGone > 0) {
+            this.velocityDecreasePerLoop = 1.0 / loopsUntilGone;
+        }
+    }
+    update() {
+        this.velocity -= this.velocityDecreasePerLoop;
+        if (this.velocity <= 0.0) {
+            this.reset();
+        }
+    }
+    reset() {
+        this.freq = -1;
+        this.sustain = false;
+        this.velocity = 1.0;
+        this.velocityDecreasePerLoop = 0.0;
     }
 }
 
-function createConstantSequence(numBeats, freq) {
+function createConstantSequence(numBeats, freq, loopsUntilGone = 0) {
     let sequence = new Array(numBeats);
     for (let j = 0; j < numBeats; ++j) {
-        sequence[j] = new SequenceElement(freq);
+        sequence[j] = new SequenceElement(freq, false, loopsUntilGone);
     }
     return sequence;
 }
@@ -297,10 +313,11 @@ function update(g, timeMillis) {
 
     if (g.newBeat) {
         for (let i = 0; i < g.NUM_SYNTHS; ++i) {
-            if (g.synthSequences[i][g.currentBeatIx].freq >= 0) {
+            let seqElem = g.synthSequences[i][g.currentBeatIx];
+            if (seqElem.freq >= 0) {
                 synthPlayVoice(
-                    g.sound.synths[i], 0, g.synthSequences[i][g.currentBeatIx].freq,
-                    g.synthSequences[i][g.currentBeatIx].sustain, g.sound.audioCtx);
+                    g.sound.synths[i], 0, seqElem.freq, seqElem.sustain, g.sound.audioCtx, seqElem.velocity);
+                seqElem.update();
             } else {
                 // =======================
                 // TODO
@@ -325,11 +342,13 @@ function update(g, timeMillis) {
         }
 
         for (let i = 0; i < g.sampleSequences.length; ++i) {
-            if (g.sampleSequences[i][g.currentBeatIx].freq >= 0) {
-                playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i])
+            let seqElem = g.sampleSequences[i][g.currentBeatIx];
+            if (seqElem.freq >= 0) {
+                playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i], seqElem.velocity)
+                seqElem.update();
                 // TODOOOOOOOO. This clears out the block-cowbells.
                 if (i === 2) {
-                    g.sampleSequences[i][g.currentBeatIx].freq = -1;
+                    seqElem.freq = -1;
                 }
             }
         }
