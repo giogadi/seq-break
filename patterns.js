@@ -249,6 +249,7 @@ class InfiniteWaves extends GameTask {
     makeRandomEnemies(g, bounds) {
         let possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
         const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
+        const SEQ_DECAY = 12;
 
         let playerAABB = {
             center: g.playerPos,
@@ -257,7 +258,8 @@ class InfiniteWaves extends GameTask {
         };
 
         // Shooters
-        let numEnemies = Math.floor(Math.random() * 4);
+        //let numEnemies = Math.floor(Math.random() * 4);
+        let numEnemies = 4;
         let enemySize = 1.0;
         let seqId = new SequenceId(SequenceType.SYNTH, 1);
         let randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
@@ -267,8 +269,8 @@ class InfiniteWaves extends GameTask {
             console.assert(randPos !== null);
 
             let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 1);
-            let seq = createConstantSequence(16, note, 5);
-            g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -downBeatDelay));
+            let seq = createConstantSequence(16, note, SEQ_DECAY);
+            g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -1));
         }
 
         // Big guys
@@ -283,7 +285,7 @@ class InfiniteWaves extends GameTask {
             console.assert(randPos !== null);
 
             let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 0);
-            let seq = createConstantSequence(16, note, 5);
+            let seq = createConstantSequence(16, note, SEQ_DECAY);
             g.spawnEnemy(new BigGuy(randPos, seq, seqId));
         }
 
@@ -298,8 +300,8 @@ class InfiniteWaves extends GameTask {
                 bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
-            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 2);
-            let seq = createConstantSequence(16, note, 5);
+            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 3);
+            let seq = createConstantSequence(16, note, SEQ_DECAY);
             g.spawnEnemy(makeMover(randPos, enemySize, seq, seqId, 'green', -downBeatDelay));
         }
     }

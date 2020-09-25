@@ -132,10 +132,10 @@ function initSound() {
         let synthSpecs = [
             {
                 gain: 0.25,
-                filterCutoff: 900,
+                filterCutoff: 1100,
                 filterModFreq: 0,
                 filterModGain: 0,
-                attackTime: 0.01,
+                attackTime: 0.0,
                 releaseTime: 0.07,
                 voiceSpecs: [
                     {
@@ -147,18 +147,18 @@ function initSound() {
                 ]
             },
             {
-                gain: 0.4,
-                filterCutoff: 600,
+                gain: 0.25,
+                filterCutoff: 1100,
                 filterModFreq: 0,
                 filterModGain: 0,
-                attackTime: 0.01,
-                releaseTime: 0.2,
+                attackTime: 0.0,
+                releaseTime: 0.07,
                 voiceSpecs: [
                     {
-                        osc1Type: 'sawtooth',
+                        osc1Type: 'square',
                         osc2Type: 'sawtooth',
-                        osc2Gain: 0.5,
-                        osc2Detune: 20 // cents
+                        osc2Gain: 0.0,
+                        osc2Detune: 0
                     }
                 ]
             },

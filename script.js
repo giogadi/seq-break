@@ -1,3 +1,6 @@
+const ENABLE_SCANNING = false;
+const ENABLE_SUSTAINING = false;
+
 const SequenceType = {
     SYNTH: 0,
     SAMPLE: 1
@@ -141,8 +144,18 @@ class GameState {
             case "a": this.controlDir.x -= 1.0; break;
             case "d": this.controlDir.x += 1.0; break;
             case "j": this.slashPressed = true; break;
-            case "k": this.scanning = true; break;
-            case "l": this.sustaining = true; break;
+            case "k": {
+                if (ENABLE_SCANNING) {
+                    this.scanning = true;
+                }
+                break;
+            }
+            case "l": {
+                if (ENABLE_SUSTAINING) {
+                    this.sustaining = true;
+                }
+                break;
+            }
         }
     }
     onKeyUp(event) {
@@ -172,8 +185,9 @@ class GameState {
                 continue;
             }
             this.enemies[i] = enemy;
-            return;
+            return i;
         }
+        return -1;
         console.log("ran out of enemies");
     }
 }
@@ -505,19 +519,19 @@ function update(g, timeMillis) {
             g.canvasCtx.restore();
 
             // DEBUG
-            if (g.slashPressed) {
-                let hb = enemyHurtBoxes[i];
-                let hbPx = [];
-                for (let j = 0; j < hb.length; ++j) {
-                    hbPx.push(vecScale(hb[j], g.pixelsPerUnit));
-                }
-                g.canvasCtx.beginPath();
-                g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
-                for (let j = 0; j < hbPx.length; ++j) {
-                    g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
-                }
-                g.canvasCtx.stroke();
-            }
+            // if (g.slashPressed) {
+            //     let hb = enemyHurtBoxes[i];
+            //     let hbPx = [];
+            //     for (let j = 0; j < hb.length; ++j) {
+            //         hbPx.push(vecScale(hb[j], g.pixelsPerUnit));
+            //     }
+            //     g.canvasCtx.beginPath();
+            //     g.canvasCtx.moveTo(hbPx[hbPx.length - 1].x, hbPx[hbPx.length - 1].y);
+            //     for (let j = 0; j < hbPx.length; ++j) {
+            //         g.canvasCtx.lineTo(hbPx[j].x, hbPx[j].y);
+            //     }
+            //     g.canvasCtx.stroke();
+            // }
         }
     }
 
@@ -550,7 +564,7 @@ async function main() {
     // Wait for user to press a key
     let msg = document.getElementById('message');
     // TODO: figure out how to make this work with a specific key (like Space).
-    msg.innerHTML = 'Please press Spacebar.';
+    msg.innerHTML = 'WSAD to move, "j" to attack. Press Space to start.';
     const waitForAnyKey = () =>
         new Promise((resolve) => {
             window.addEventListener('keydown', () => resolve(), {once: true});
