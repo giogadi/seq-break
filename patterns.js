@@ -14,7 +14,7 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
 
     for (i = 0; i < 10; ++i) {
         let randPos = sampleCollisionFreeAABBPos(
-            bounds, enemySize, enemySize, 50, enemies, tileMapInfo, tileSet);
+            bounds, enemySize, enemySize, 50, enemies, null, tileMapInfo, tileSet);
         console.assert(randPos !== null);
 
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
@@ -40,7 +40,7 @@ function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileM
     }
     for (i = 0; i < 4; ++i) {
         let randPos = sampleCollisionFreeAABBPos(
-            bounds, enemySize, enemySize, 50, enemies, tileMapInfo, tileSet);
+            bounds, enemySize, enemySize, 50, enemies, null, tileMapInfo, tileSet);
         console.assert(randPos !== null);
 
         let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
@@ -166,7 +166,7 @@ class MoverWave extends GameTask {
         }
         for (let i = 0; i < 10; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, gameState.enemies, gameState.tileMapInfo, gameState.tileSet);
+                bounds, enemySize, enemySize, 50, gameState.enemies, null, gameState.tileMapInfo, gameState.tileSet);
             console.assert(randPos !== null);
     
             let note = getFreq(possibleNotes[i % possibleNotes.length], 3);
@@ -196,13 +196,17 @@ class MoverWave extends GameTask {
 }
 
 // Returns null if no valid point was found
+//
+// playerAABB: { center, width, height }
 function sampleCollisionFreeAABBPos(
-    sampleBounds, boxWidth, boxHeight, maxNumTries, enemies, tileMapInfo = null, tileSet = null) {
+    sampleBounds, boxWidth, boxHeight, maxNumTries, enemies, playerAABB = null, tileMapInfo = null, tileSet = null) {
     let checkTileMap = tileMapInfo !== null && tileSet !== null;
     for (let i = 0; i < maxNumTries; ++i) {
         let randPos = rand2dInBounds(sampleBounds);
         if ((!checkTileMap ||
              !isBoxInCollisionWithMap(randPos, boxWidth, boxHeight, tileMapInfo, tileSet)) &&
+            (playerAABB === null ||
+             !doAABBsOverlap(randPos, boxWidth, boxHeight, playerAABB.center, playerAABB.width, playerAABB.height)) &&
             !aabbCollidesWithSomeEnemy(randPos, boxWidth, boxHeight, enemies)) {
             return randPos;
         }
@@ -246,6 +250,12 @@ class InfiniteWaves extends GameTask {
         let possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
         const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
 
+        let playerAABB = {
+            center: g.playerPos,
+            width: g.playerSize * 1.5,
+            height: g.playerSize * 1.5
+        };
+
         // Shooters
         let numEnemies = Math.floor(Math.random() * 4);
         let enemySize = 1.0;
@@ -253,7 +263,7 @@ class InfiniteWaves extends GameTask {
         let randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
             let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 1);
@@ -269,7 +279,7 @@ class InfiniteWaves extends GameTask {
         randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
             let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 0);
@@ -285,7 +295,7 @@ class InfiniteWaves extends GameTask {
         randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
         for (let i = 0; i < numEnemies; ++i) {
             let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, g.tileMapInfo, g.tileSet);
+                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
             console.assert(randPos !== null);
 
             let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 2);

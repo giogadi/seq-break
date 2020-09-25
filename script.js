@@ -103,6 +103,10 @@ class GameState {
         this.slashPressed = false;
         this.sustaining = false;
         this.scanning = false;
+        // If >= 0.0, invuln until INVULN_TIME
+        this.invulnTimer = -1.0;
+        this.INVULN_TIME = 1.0;
+        this.BLINK_TIME = 0.1;
 
         this.prevTimeMillis = -1.0;
 
@@ -375,6 +379,34 @@ function update(g, timeMillis) {
         g.enemies[eIx].update(dt, g);
     }
 
+    // Handle player touching enemy
+    if (g.invulnTimer < 0.0) {
+        let playerHurtBox = getOOBBCornerPoints(
+            g.playerPos, unitVecFromAngle(g.playerHeading), g.playerSize, g.playerSize);
+        for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
+            let e = g.enemies[eIx];
+            if (!e.alive) {
+                continue;
+            }
+            let enemyHitBox = e.getHitBox();
+            if (doConvexPolygonsOverlap(playerHurtBox, enemyHitBox)) {
+                playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[2]);
+                g.invulnTimer = 0.0;
+                break;
+            }
+        }
+    }
+
+    let shouldDrawPlayer = true;
+    if (g.invulnTimer >= 0.0) {
+        g.invulnTimer += dt;
+        if (g.invulnTimer < g.INVULN_TIME) {
+            shouldDrawPlayer = Math.floor(g.invulnTimer / g.BLINK_TIME) % 2 === 0;
+        } else {
+            g.invulnTimer = -1.0;
+        }
+    }
+
     g.canvasCtx.fillStyle = 'grey';
     g.canvasCtx.fillRect(0, 0, g.canvas.width, g.canvas.height);    
 
@@ -402,19 +434,21 @@ function update(g, timeMillis) {
     // javascript does.
 
     // Draw Player
-    let playerPosPx = vecScale(g.playerPos, g.pixelsPerUnit);
-    let playerSizePx = g.playerSize * g.pixelsPerUnit;
-    g.canvasCtx.save();
-    g.canvasCtx.fillStyle = 'red';
-    g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
-    g.canvasCtx.rotate(g.playerHeading);
-    g.canvasCtx.fillRect(-0.5*playerSizePx,
-                         -0.5*playerSizePx,
-                         playerSizePx, playerSizePx);
-    const EYE_SIZE = 0.25*playerSizePx;
-    g.canvasCtx.fillStyle = 'black';
-    g.canvasCtx.fillRect(0.5*playerSizePx - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
-    g.canvasCtx.restore();
+    if (shouldDrawPlayer) {
+        let playerPosPx = vecScale(g.playerPos, g.pixelsPerUnit);
+        let playerSizePx = g.playerSize * g.pixelsPerUnit;
+        g.canvasCtx.save();
+        g.canvasCtx.fillStyle = 'red';
+        g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
+        g.canvasCtx.rotate(g.playerHeading);
+        g.canvasCtx.fillRect(-0.5*playerSizePx,
+                            -0.5*playerSizePx,
+                            playerSizePx, playerSizePx);
+        const EYE_SIZE = 0.25*playerSizePx;
+        g.canvasCtx.fillStyle = 'black';
+        g.canvasCtx.fillRect(0.5*playerSizePx - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
+        g.canvasCtx.restore();
+    }
 
     // Draw Enemies
     g.canvasCtx.strokeStyle = 'white';

@@ -31,9 +31,12 @@ class Enemy {
             -0.5*sizePx,
             sizePx, sizePx);
     }
-    getHurtBox() {
+    getHitBox() {
         return getOOBBCornerPoints(
-            this.pos, unitVecFromAngle(this.heading), this.sideLength, this.sideLength);
+            this.pos, unitVecFromAngle(this.heading), this.sideLength, this.sideLength); 
+    }
+    getHurtBox() {
+        return this.getHitBox();
     }
 }
 
