@@ -1,8 +1,10 @@
 function getJsonData(filename) {
     return new Promise(function(resolve, reject) {
+        let pathname = window.location.pathname;
+        pathname = pathname.substring(0, pathname.lastIndexOf('/'));
         let request = new XMLHttpRequest();
         request.open(
-            'GET', 'http://' + window.location.hostname + ":80/" + filename);
+            'GET', 'http://' + window.location.hostname + pathname + "/" + filename);
         request.responseType = 'json';
         request.onload = function() {
             resolve(request.response);
