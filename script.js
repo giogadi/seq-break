@@ -124,48 +124,42 @@ class GameState {
         } else {
             this.sampleSequences[0][0].freq = this.sampleSequences[0][4].freq = this.sampleSequences[0][8].freq = this.sampleSequences[0][12].freq = 0;
         }
-        
-        window.addEventListener('keydown', (e) => this.onKeyDown(e));
-        window.addEventListener('keyup', (e) => this.onKeyUp(e));
+
+        this.upPressed = false;
+        this.downPressed = false;
+        this.leftPressed = false;
+        this.rightPressed = false;
+        this.readyForNewSlash = true;
+
+        kd.W.down(() => this.upPressed = true);
+        kd.S.down(() => this.downPressed = true);
+        kd.A.down(() => this.leftPressed = true);
+        kd.D.down(() => this.rightPressed = true);
+        kd.J.down(() => this.slashPressed = true);
+
+        kd.W.up(() => this.upPressed = false);
+        kd.S.up(() => this.downPressed = false);
+        kd.A.up(() => this.leftPressed = false);
+        kd.D.up(() => this.rightPressed = false);
+        kd.J.up(() => {
+            this.slashPressed = false;
+            this.readyForNewSlash = true;
+        });
+
+        if (ENABLE_SCANNING) {
+            kd.K.down(() => this.scanning = true);
+            kd.K.up(() => this.scanning = false);
+        }
+
+        if (ENABLE_SUSTAINING) {
+            kd.K.down(() => this.sustaining = true);
+            kd.K.up(() => this.sustaining = false);
+        }
     }
     bounds() {
         return {
             min: { x: 0.0, y: 0.0 },
             max: { x: this.tileMapInfo.width, y: this.tileMapInfo.height }
-        }
-    }
-    onKeyDown(event) {
-        if (event.repeat) {
-            return;
-        }
-        switch (event.key) {
-            case "w": this.controlDir.y -= 1.0; break;
-            case "s": this.controlDir.y += 1.0; break;
-            case "a": this.controlDir.x -= 1.0; break;
-            case "d": this.controlDir.x += 1.0; break;
-            case "j": this.slashPressed = true; break;
-            case "k": {
-                if (ENABLE_SCANNING) {
-                    this.scanning = true;
-                }
-                break;
-            }
-            case "l": {
-                if (ENABLE_SUSTAINING) {
-                    this.sustaining = true;
-                }
-                break;
-            }
-        }
-    }
-    onKeyUp(event) {
-        switch (event.key) {
-            case "w": this.controlDir.y += 1.0; break;
-            case "s": this.controlDir.y -= 1.0; break;
-            case "a": this.controlDir.x += 1.0; break;
-            case "d": this.controlDir.x -= 1.0; break;
-            case "k": this.scanning = false; break;
-            case "l": this.sustaining = false; break;
         }
     }
     getSequence(sequenceId) {
@@ -214,6 +208,25 @@ function drawSequence(canvasCtx, numBeats, currentBeatIx, canvasWidth, canvasHei
 }
 
 function update(g, timeMillis) {
+    kd.tick();
+    g.controlDir = { x: 0.0, y: 0.0 };
+    if (g.upPressed) {
+        g.controlDir.y -= 1.0;
+    }
+    if (g.downPressed) {
+        g.controlDir.y += 1.0;
+    }
+    if (g.leftPressed) {
+        g.controlDir.x -= 1.0;
+    }
+    if (g.rightPressed) {
+        g.controlDir.x += 1.0;
+    }
+    let doSlash = g.readyForNewSlash && g.slashPressed;
+    if (doSlash) {
+        g.readyForNewSlash = false;
+    }
+
     if (g.prevTimeMillis < 0.0) {
         g.prevTimeMillis = timeMillis;
     }
@@ -254,7 +267,7 @@ function update(g, timeMillis) {
     // Handle slash
     let hitBox = null;
     let enemyHurtBoxes = [];
-    if (g.slashPressed || g.sustaining) {
+    if (doSlash || g.sustaining) {
         let headingVec = unitVecFromAngle(g.playerHeading);
         let hitBoxCenter = vecAdd(g.playerPos, vecScale(headingVec, g.playerSize));
         hitBox = getOOBBCornerPoints(hitBoxCenter, headingVec, 2*g.playerSize, g.playerSize);
@@ -536,7 +549,7 @@ function update(g, timeMillis) {
     }
 
     // Draw slash
-    if (g.slashPressed) {
+    if (doSlash) {
         g.canvas.strokeStyle = 'black';
         console.assert(hitBox !== null);
         let hbPx = [];
@@ -554,8 +567,6 @@ function update(g, timeMillis) {
     g.canvasCtx.restore();
 
     drawSequence(g.canvasCtx, g.NUM_BEATS, g.currentBeatIx, g.canvas.width, g.canvas.height);
-
-    g.slashPressed = false;
 
     window.requestAnimationFrame((t) => update(g, t));
 }

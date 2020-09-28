@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.4" tiledversion="1.4.2" orientation="orthogonal" renderorder="right-down" width="80" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="11">
+<map version="1.4" tiledversion="1.4.2" orientation="orthogonal" renderorder="right-down" width="80" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="12">
  <editorsettings>
   <export target="level1.json" format="json"/>
  </editorsettings>
@@ -71,6 +71,9 @@
    <point/>
   </object>
   <object id="10" name="room1door4" x="432" y="304">
+   <point/>
+  </object>
+  <object id="11" x="480" y="256">
    <point/>
   </object>
  </objectgroup>
