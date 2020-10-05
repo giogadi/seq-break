@@ -276,49 +276,49 @@ function update(g, timeMillis) {
             let e = g.enemies[i];
             let enemyHurtBox = e.getHurtBox();
             enemyHurtBoxes.push(enemyHurtBox);
-            if (!e.alive) {
+            if (!e.alive ||
+                !doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
                 continue;
             }
-            if (doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
-                let seq = g.getSequence(e.sequenceId);
-                let hitIx = -1;
-                if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].freq >= 0 && seq[g.currentBeatIx].freq >= 0) {
-                    hitIx = g.currentBeatIx;
-                } else {
-                    hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
-                }
-                if (e.seq[hitIx].freq >= 0) {
-                    seq[hitIx] = e.seq[hitIx];
-                    // TODO do this cleaner please
-                    if (hitIx === g.currentBeatIx && !g.newBeat) {
-                        switch (e.sequenceId.type) {
-                            case SequenceType.SYNTH: {
-                                synthPlayVoice(
-                                    g.sound.synths[e.sequenceId.ix], 0, seq[hitIx].freq,
-                                    seq[hitIx].sustain, g.sound.audioCtx);
-                                break;
-                            }
-                            case SequenceType.SAMPLE: {
-                                playSoundFromBuffer(
-                                    g.sound.audioCtx, g.sound.drumSounds[e.sequenceId.ix]);
-                                break;
-                            }
+            let seq = g.getSequence(e.sequenceId);
+            let hitIx = -1;
+            if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].freq >= 0 && seq[g.currentBeatIx].freq >= 0) {
+                hitIx = g.currentBeatIx;
+            } else {
+                hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
+            }
+            if (e.seq[hitIx].freq >= 0) {
+                // TODO do this cleaner please
+                if (hitIx === g.currentBeatIx && !g.newBeat) {
+                    switch (e.sequenceId.type) {
+                        case SequenceType.SYNTH: {
+                            synthPlayVoice(
+                                g.sound.synths[e.sequenceId.ix], 0, e.seq[hitIx].freq,
+                                e.seq[hitIx].sustain, g.sound.audioCtx);
+                            break;
+                        }
+                        case SequenceType.SAMPLE: {
+                            playSoundFromBuffer(
+                                g.sound.audioCtx, g.sound.drumSounds[e.sequenceId.ix]);
+                            break;
                         }
                     }
-                    // TODO BLAGH
-                    if (e.sequenceId.type !== SequenceType.SYNTH || e.sequenceId.ix !== 2) {
-                        e.alive = false;
-                    }
+                }
+                e.hurtBase(g.playerPos);
+                if (e.alive) {
+                    seq[hitIx] = new SequenceElement(e.seq[hitIx].freq, e.seq[hitIx].sustain, 1);
                 } else {
-                    // AGAIN, do this cleaner pls.
-                    if (hitIx === g.currentBeatIx && !g.newBeat) {
-                        playSoundFromBuffer(
-                            g.sound.audioCtx, g.sound.drumSounds[2]);
-                    } else {
-                        // Get dat cowbell seq
-                        let seq = g.getSequence(new SequenceId(SequenceType.SAMPLE, 2));
-                        seq[hitIx].freq = 0;
-                    }
+                    seq[hitIx] = e.seq[hitIx];
+                }
+            } else {
+                // AGAIN, do this cleaner pls.
+                if (hitIx === g.currentBeatIx && !g.newBeat) {
+                    playSoundFromBuffer(
+                        g.sound.audioCtx, g.sound.drumSounds[2]);
+                } else {
+                    // Get dat cowbell seq
+                    let seq = g.getSequence(new SequenceId(SequenceType.SAMPLE, 2));
+                    seq[hitIx] = new SequenceElement(0, false, 1);
                 }
             }
         }
@@ -377,10 +377,6 @@ function update(g, timeMillis) {
             if (seqElem.freq >= 0) {
                 playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[i], seqElem.velocity)
                 seqElem.update();
-                // TODOOOOOOOO. This clears out the block-cowbells.
-                if (i === 2) {
-                    seqElem.freq = -1;
-                }
             }
         }
     }
@@ -403,7 +399,7 @@ function update(g, timeMillis) {
         if (!g.enemies[eIx].alive) {
             continue;
         }
-        g.enemies[eIx].update(dt, g);
+        g.enemies[eIx].updateBase(dt, g);
     }
 
     // Handle player touching enemy
@@ -486,7 +482,7 @@ function update(g, timeMillis) {
         currentRenderLayer = nextRenderLayer;
         for (i = 0; i < g.enemies.length; ++i) {
             let e = g.enemies[i];
-            if (!e.alive) {
+            if (!e.alive || e.renderLayer < currentRenderLayer) {
                 continue;
             }
             if (e.renderLayer > currentRenderLayer) {
@@ -502,7 +498,7 @@ function update(g, timeMillis) {
             g.canvasCtx.translate(posPx.x, posPx.y);
             g.canvasCtx.rotate(e.heading);
 
-            e.draw(g.canvasCtx, g.pixelsPerUnit);
+            e.drawBase(g.canvasCtx, g.pixelsPerUnit);
 
             let sizePx = e.sideLength * g.pixelsPerUnit;
             if (e.seq[g.currentBeatIx].freq < 0) {

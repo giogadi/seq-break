@@ -27,6 +27,13 @@ function vecAdd(u, v) {
     }
 }
 
+function vecSub(u, v) {
+    return {
+        x: u.x - v.x,
+        y: u.y - v.y
+    }
+}
+
 // 90 degrees rotated counter-clockwise from v.
 function rotate90Ccw(v) {
     return { x: -v.y, y: v.x };

@@ -1,59 +1,92 @@
-function generateRandomEnemies(numBeats, currentBeatIx, bounds, enemySize, tileMapInfo, tileSet) {
-    console.assert(currentBeatIx >= 0);
-    let enemies = []
-    const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-    // const possibleNotes = [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A];
+// Returns null if no valid point was found
+//
+// playerAABB: { center, width, height }
+function sampleCollisionFreeAABBPos(
+    sampleBounds, boxWidth, boxHeight, maxNumTries, enemies, playerAABB = null, tileMapInfo = null, tileSet = null) {
+    let checkTileMap = tileMapInfo !== null && tileSet !== null;
+    for (let i = 0; i < maxNumTries; ++i) {
+        let randPos = rand2dInBounds(sampleBounds);
+        if ((!checkTileMap ||
+             !isBoxInCollisionWithMap(randPos, boxWidth, boxHeight, tileMapInfo, tileSet)) &&
+            (playerAABB === null ||
+             !doAABBsOverlap(randPos, boxWidth, boxHeight, playerAABB.center, playerAABB.width, playerAABB.height)) &&
+            !aabbCollidesWithSomeEnemy(randPos, boxWidth, boxHeight, enemies)) {
+            return randPos;
+        }
+    }
+    return null;
+}
 
-    // Delay enemy logic sequences so that they start on a downbeat.
+function getDownBeatDelay(currentBeatIx) {
     let downbeatOffset = currentBeatIx % 4;
     let delayBeats = 0;
     // 0 -> 0, 1 -> 3, 2 -> 2, 3 -> 1
     if (downbeatOffset !== 0) {
         delayBeats = 4 - downbeatOffset;
     }
+    return delayBeats;
+}
 
-    for (i = 0; i < 10; ++i) {
+function makeRandomEnemies(g, bounds) {
+    //let possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+    let possibleNotes = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A];
+    const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
+    const SEQ_DECAY = 12;
+
+    let playerAABB = {
+        center: g.playerPos,
+        width: g.playerSize * 1.5,
+        height: g.playerSize * 1.5
+    };
+
+    // Shooters
+    //let numEnemies = Math.floor(Math.random() * 4);
+    let numEnemies = 4;
+    let enemySize = 1.0;
+    let seqId = new SequenceId(SequenceType.SYNTH, 1);
+    let randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
+    for (let i = 0; i < numEnemies; ++i) {
         let randPos = sampleCollisionFreeAABBPos(
-            bounds, enemySize, enemySize, 50, enemies, null, tileMapInfo, tileSet);
+            bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
         console.assert(randPos !== null);
 
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 3);
-        // Example code for making enemies vulnerable at certain times, and they syncopate with each other.
-        // let sequence = new Array(numBeats).fill(-1);
-        // if (i % 2 == 0) {
-        //     // Down-beats
-        //     for (let j = 0; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // } else {
-        //     // Up-beats
-        //     for (let j = 2; j < sequence.length; j += 4) {
-        //         sequence[j] = sequence[j+1] = randomNote;
-        //     }
-        // }
-        let sequence = new Array(numBeats);
-        for (let j = 0; j < sequence.length; ++j) {
-            sequence[j] = new SequenceElement(randomNote);
-        }
-        let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
-        enemies.push(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
+        let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 1);
+        let seq = createConstantSequence(16, note, SEQ_DECAY);
+        g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -1));
     }
-    for (i = 0; i < 4; ++i) {
+
+    // Big guys
+    numEnemies = 1;
+    // TODO: This is actually not being passed to bigguy's constructor, BE CAREFUL
+    enemySize = 1.5;
+    seqId = new SequenceId(SequenceType.SYNTH, 3);
+    randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
+    for (let i = 0; i < numEnemies; ++i) {
         let randPos = sampleCollisionFreeAABBPos(
-            bounds, enemySize, enemySize, 50, enemies, null, tileMapInfo, tileSet);
+            bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
         console.assert(randPos !== null);
 
-        let randomNote = getFreq(possibleNotes[Math.floor(Math.random() * possibleNotes.length)], 1);
-        let sequence = new Array(numBeats);
-        for (let j = 0; j < sequence.length; ++j) {
-            sequence[j] = new SequenceElement(randomNote);
-        }
-        let sequenceId = new SequenceId(SequenceType.SYNTH, 1);
-        // Further offset each enemy's logic by 1 downbeat so they don't all shoot at the same time.
-        let delay = delayBeats + 4*i;
-        enemies.push(makeStationaryShooter(randPos, enemySize, sequence, sequenceId, 'darkgoldenrod', -delay));
+        let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 0);
+        let seq = createConstantSequence(16, note, SEQ_DECAY);
+        g.spawnEnemy(new BigGuy(randPos, seq, seqId));
     }
-    return enemies;
+
+    // Movers
+    // possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+    possibleNotes = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A];
+    numEnemies = Math.random() * 8;
+    enemySize = 1.0;
+    seqId = new SequenceId(SequenceType.SYNTH, 0);
+    randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
+    for (let i = 0; i < numEnemies; ++i) {
+        let randPos = sampleCollisionFreeAABBPos(
+            bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
+        console.assert(randPos !== null);
+
+        let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 3);
+        let seq = createConstantSequence(16, note, SEQ_DECAY);
+        g.spawnEnemy(makeMover(randPos, enemySize, seq, seqId, 'green', -downBeatDelay));
+    }
 }
 
 class GenerateRandomEnemies extends GameTask {
@@ -62,9 +95,7 @@ class GenerateRandomEnemies extends GameTask {
         this.bounds = bounds;
     }
     update(gameState, dt) {
-        gameState.enemies = generateRandomEnemies(
-            gameState.NUM_BEATS, gameState.currentBeatIx, this.bounds,
-            1.0, gameState.tileMapInfo, gameState.tileSet);
+        makeRandomEnemies(gameState, this.bounds);
         return true;
     }
 }
@@ -195,35 +226,6 @@ class MoverWave extends GameTask {
     }
 }
 
-// Returns null if no valid point was found
-//
-// playerAABB: { center, width, height }
-function sampleCollisionFreeAABBPos(
-    sampleBounds, boxWidth, boxHeight, maxNumTries, enemies, playerAABB = null, tileMapInfo = null, tileSet = null) {
-    let checkTileMap = tileMapInfo !== null && tileSet !== null;
-    for (let i = 0; i < maxNumTries; ++i) {
-        let randPos = rand2dInBounds(sampleBounds);
-        if ((!checkTileMap ||
-             !isBoxInCollisionWithMap(randPos, boxWidth, boxHeight, tileMapInfo, tileSet)) &&
-            (playerAABB === null ||
-             !doAABBsOverlap(randPos, boxWidth, boxHeight, playerAABB.center, playerAABB.width, playerAABB.height)) &&
-            !aabbCollidesWithSomeEnemy(randPos, boxWidth, boxHeight, enemies)) {
-            return randPos;
-        }
-    }
-    return null;
-}
-
-function getDownBeatDelay(currentBeatIx) {
-    let downbeatOffset = currentBeatIx % 4;
-    let delayBeats = 0;
-    // 0 -> 0, 1 -> 3, 2 -> 2, 3 -> 1
-    if (downbeatOffset !== 0) {
-        delayBeats = 4 - downbeatOffset;
-    }
-    return delayBeats;
-}
-
 class InfiniteWaves extends GameTask {
     constructor() {
         super();
@@ -242,68 +244,9 @@ class InfiniteWaves extends GameTask {
         }
 
         if (allEnemiesDead) {
-            this.makeRandomEnemies(g, this.bounds);
+            makeRandomEnemies(g, this.bounds);
         }
         return false;
-    }
-    makeRandomEnemies(g, bounds) {
-        let possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-        const downBeatDelay = getDownBeatDelay(g.currentBeatIx);
-        const SEQ_DECAY = 12;
-
-        let playerAABB = {
-            center: g.playerPos,
-            width: g.playerSize * 1.5,
-            height: g.playerSize * 1.5
-        };
-
-        // Shooters
-        //let numEnemies = Math.floor(Math.random() * 4);
-        let numEnemies = 4;
-        let enemySize = 1.0;
-        let seqId = new SequenceId(SequenceType.SYNTH, 1);
-        let randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
-        for (let i = 0; i < numEnemies; ++i) {
-            let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
-            console.assert(randPos !== null);
-
-            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 1);
-            let seq = createConstantSequence(16, note, SEQ_DECAY);
-            g.spawnEnemy(makeStationaryShooter(randPos, enemySize, seq, seqId, 'darkgoldenrod', -1));
-        }
-
-        // Big guys
-        numEnemies = Math.random() * 2;
-        // TODO: This is actually not being passed to bigguy's constructor, BE CAREFUL
-        enemySize = 1.5;
-        seqId = new SequenceId(SequenceType.SYNTH, 3);
-        randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
-        for (let i = 0; i < numEnemies; ++i) {
-            let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
-            console.assert(randPos !== null);
-
-            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 0);
-            let seq = createConstantSequence(16, note, SEQ_DECAY);
-            g.spawnEnemy(new BigGuy(randPos, seq, seqId));
-        }
-
-        // Movers
-        possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
-        numEnemies = Math.random() * 8;
-        enemySize = 1.0;
-        seqId = new SequenceId(SequenceType.SYNTH, 0);
-        randNoteOffset = Math.floor(Math.random() * possibleNotes.length);
-        for (let i = 0; i < numEnemies; ++i) {
-            let randPos = sampleCollisionFreeAABBPos(
-                bounds, enemySize, enemySize, 50, g.enemies, playerAABB, g.tileMapInfo, g.tileSet);
-            console.assert(randPos !== null);
-
-            let note = getFreq(possibleNotes[(i + randNoteOffset) % possibleNotes.length], 3);
-            let seq = createConstantSequence(16, note, SEQ_DECAY);
-            g.spawnEnemy(makeMover(randPos, enemySize, seq, seqId, 'green', -downBeatDelay));
-        }
     }
 }
 
