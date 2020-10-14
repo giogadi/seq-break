@@ -220,10 +220,38 @@ class MoverWave extends GameTask {
                 sequence[j] = new SequenceElement(note);
             }
             let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
-            gameState.spawnEnemy(makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats));
+            let m = makeMover(randPos, enemySize, sequence, sequenceId, 'green', -delayBeats);
+            gameState.spawnEnemy(m);
         }
         return true;
     }
+}
+
+class DumbWave extends GameTask {
+    update(gameState, dt) {
+        const enemySize = 1.0;
+        const possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
+        const bounds = {
+            min: { x: 0.0, y: 0.0 },
+            max: { x: 15.0, y: 9.0 }
+        }
+        for (let i = 0; i < 10; ++i) {
+            let randPos = sampleCollisionFreeAABBPos(
+                bounds, enemySize, enemySize, 50, gameState.enemies, null, gameState.tileMapInfo, gameState.tileSet);
+            console.assert(randPos !== null);
+    
+            let note = getFreq(possibleNotes[i % possibleNotes.length], 3);
+            let sequence = new Array(16);
+            for (let j = 0; j < 16; ++j) {
+                sequence[j] = new SequenceElement(note);
+            }
+            let sequenceId = new SequenceId(SequenceType.SYNTH, 0);
+            // DEBUG
+            let e = new Enemy(randPos, enemySize, sequence, sequenceId, 'green');
+            gameState.spawnEnemy(e);
+        }
+        return true;
+    } 
 }
 
 class InfiniteWaves extends GameTask {
@@ -252,7 +280,8 @@ class InfiniteWaves extends GameTask {
 
 class SetStandardKickPattern extends GameTask {
     update(gameState, dt) {
-        gameState.sampleSequences[0][0].freq = gameState.sampleSequences[0][4].freq = gameState.sampleSequences[0][8].freq = gameState.sampleSequences[0][12].freq = 0;
+        let kickIx = 0;
+        gameState.sampleSequences[kickIx][0].freq = gameState.sampleSequences[kickIx][4].freq = gameState.sampleSequences[kickIx][8].freq = gameState.sampleSequences[kickIx][12].freq = 0;
         return true;
     }
 }
@@ -269,6 +298,7 @@ function defaultTaskList(gameState) {
     // taskList.push(new WaitUntilAllEnemiesDead());
     // taskList.push(new WaitForLoopStart());
     // taskList.push(new MoverWave());
+    // taskList.push(new DumbWave());
     taskList.push(new InfiniteWaves());
     return taskList;
 }

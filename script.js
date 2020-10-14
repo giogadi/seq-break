@@ -103,13 +103,16 @@ class GameState {
         }
 
         this.controlDir = { x: 0.0, y: 0.0 };
-        this.slashPressed = false;
         this.sustaining = false;
         this.scanning = false;
         // If >= 0.0, invuln until INVULN_TIME
         this.invulnTimer = -1.0;
         this.INVULN_TIME = 1.0;
         this.BLINK_TIME = 0.1;
+
+        this.SLASH_COOLDOWN_BEATS_NON_COMBO = 0;
+        this.SLASH_COOLDOWN_BEATS_COMBO = 0;
+        this.slashCooldownBeatsRemaining = 0;
 
         this.prevTimeMillis = -1.0;
 
@@ -129,13 +132,17 @@ class GameState {
         this.downPressed = false;
         this.leftPressed = false;
         this.rightPressed = false;
-        this.readyForNewSlash = true;
+        this.slashPressed = false;
+        this.slashJustPressedThisFrame = false;
 
         kd.W.down(() => this.upPressed = true);
         kd.S.down(() => this.downPressed = true);
         kd.A.down(() => this.leftPressed = true);
         kd.D.down(() => this.rightPressed = true);
-        kd.J.down(() => this.slashPressed = true);
+        kd.J.down(() => {
+            this.slashJustPressedThisFrame = !this.slashPressed;
+            this.slashPressed = true;
+        });
 
         kd.W.up(() => this.upPressed = false);
         kd.S.up(() => this.downPressed = false);
@@ -143,7 +150,7 @@ class GameState {
         kd.D.up(() => this.rightPressed = false);
         kd.J.up(() => {
             this.slashPressed = false;
-            this.readyForNewSlash = true;
+            this.slashJustPressedThisFrame = false;
         });
 
         if (ENABLE_SCANNING) {
@@ -222,10 +229,6 @@ function update(g, timeMillis) {
     if (g.rightPressed) {
         g.controlDir.x += 1.0;
     }
-    let doSlash = g.readyForNewSlash && g.slashPressed;
-    if (doSlash) {
-        g.readyForNewSlash = false;
-    }
 
     if (g.prevTimeMillis < 0.0) {
         g.prevTimeMillis = timeMillis;
@@ -265,8 +268,33 @@ function update(g, timeMillis) {
     }
 
     // Handle slash
+    let doSlash = false;
+    let potentialComboStart = false;
+    if (g.slashCooldownBeatsRemaining > 0 && g.newBeat) {
+        --g.slashCooldownBeatsRemaining;
+    }
+    if (g.slashJustPressedThisFrame) {
+        if (g.slashCooldownBeatsRemaining <= 0) {
+            doSlash = true;
+            if (g.currentBeatIx % 2 === 0) {
+                if (fracAheadOfCurrent < 0.6) {
+                    potentialComboStart = true;
+                } else {
+                    console.log("LATE " + fracAheadOfCurrent);
+                }
+            }
+            if (g.currentBeatIx % 2 === 1) {
+                if (fracAheadOfCurrent > 0.6) {
+                    potentialComboStart = true;
+                } else {
+                    console.log("EARLY " + fracAheadOfCurrent);
+                }
+            }
+        }
+    }
     let hitBox = null;
     let enemyHurtBoxes = [];
+    let comboStart = false;
     if (doSlash || g.sustaining) {
         let headingVec = unitVecFromAngle(g.playerHeading);
         let hitBoxCenter = vecAdd(g.playerPos, vecScale(headingVec, g.playerSize));
@@ -280,9 +308,12 @@ function update(g, timeMillis) {
                 !doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
                 continue;
             }
+            if (potentialComboStart) {
+                comboStart = true;
+            }
             let seq = g.getSequence(e.sequenceId);
             let hitIx = -1;
-            if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].freq >= 0 && seq[g.currentBeatIx].freq >= 0) {
+            if (fracAheadOfCurrent < 0.5 && e.seq[g.currentBeatIx].freq >= 0) {    
                 hitIx = g.currentBeatIx;
             } else {
                 hitIx = (g.currentBeatIx + 1) % g.NUM_BEATS;
@@ -321,6 +352,12 @@ function update(g, timeMillis) {
                     seq[hitIx] = new SequenceElement(0, false, 1);
                 }
             }
+        }
+
+        if (comboStart) {
+            g.slashCooldownBeatsRemaining = g.SLASH_COOLDOWN_BEATS_COMBO;
+        } else {
+            g.slashCooldownBeatsRemaining = g.SLASH_COOLDOWN_BEATS_NON_COMBO;
         }
     }
 
