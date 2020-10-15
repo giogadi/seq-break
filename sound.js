@@ -55,7 +55,7 @@ function getFreq(note, octave) {
     return BASE_FREQS[note] * (1 << octave);
 }
 
-function initSynth(audioCtx, synthSpec) {
+function initSynth(audioCtx, synthSpec, masterGain) {
     // TODO: consider making this more efficient if no modulation gain/freq are 0.
     filterNode = audioCtx.createBiquadFilter();
     filterNode.type = 'lowpass';
@@ -71,7 +71,7 @@ function initSynth(audioCtx, synthSpec) {
     gainNode = audioCtx.createGain();
     gainNode.gain.setValueAtTime(synthSpec.gain, audioCtx.currentTime);
     filterNode.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
+    gainNode.connect(masterGain);
     let voices = [];
     for (let i = 0; i < synthSpec.voiceSpecs.length; ++i) {
         // TODO: consider making this more efficient if osc2Gain == 0 by only initializing one oscillator.
@@ -131,6 +131,9 @@ function initSound() {
             return audioCtx.decodeAudioData(loadedSound);
         }));
     }).then(function(decodedSounds) {
+        let masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+
         let synthSpecs = [
             {
                 gain: 0.25,
@@ -200,8 +203,8 @@ function initSound() {
         let synths = [];
         let auxSynths = [];
         for (let i = 0; i < synthSpecs.length; ++i) {
-            synths.push(initSynth(audioCtx, synthSpecs[i]));
-            auxSynths.push(initSynth(audioCtx, synthSpecs[i]));
+            synths.push(initSynth(audioCtx, synthSpecs[i], masterGain));
+            auxSynths.push(initSynth(audioCtx, synthSpecs[i], masterGain));
         }
 
         // drone sound
@@ -221,14 +224,14 @@ function initSound() {
         droneGain.gain.value = 0.0;
         droneSource.connect(droneFilter);
         droneFilter.connect(droneGain);
-        droneGain.connect(audioCtx.destination);
+        droneGain.connect(masterGain);
         droneSource.start(0);
 
         let sampleSounds = [];
         for (let i = 0; i < decodedSounds.length; ++i) {
             let sampleGainNode = audioCtx.createGain();
             sampleGainNode.gain.value = 0.5;
-            sampleGainNode.connect(audioCtx.destination);
+            sampleGainNode.connect(masterGain);
             sampleSounds.push({ buffer: decodedSounds[i], gainNode: sampleGainNode });
         }
         // Set hihat to lower gain
@@ -241,7 +244,8 @@ function initSound() {
             droneFilter: droneFilter,
             droneGain: droneGain,
             synths: synths,
-            auxSynths: auxSynths
+            auxSynths: auxSynths,
+            masterGain: masterGain
         }
     });
 }

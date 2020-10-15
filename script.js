@@ -1,5 +1,7 @@
 const ENABLE_SCANNING = false;
 const ENABLE_SUSTAINING = false;
+const ENABLE_SOUND = true;
+const RENDER_HITBOX = false;
 
 const SequenceType = {
     SYNTH: 0,
@@ -45,8 +47,24 @@ function createConstantSequence(numBeats, freq, loopsUntilGone = 0) {
     return sequence;
 }
 
+const Directions = {
+    RIGHT: 0,
+    DOWN: 1,
+    LEFT: 2,
+    UP: 3
+}
+
+function vecFromDirection(d) {
+    switch (d) {
+        case Directions.RIGHT: return { x: 1.0, y: 0.0 };
+        case Directions.DOWN: return { x: 0.0, y: 1.0 };
+        case Directions.LEFT: return { x: -1.0, y: 0.0 };
+        case Directions.UP: return { x: 0.0, y: -1.0 };
+    }
+}
+
 class GameState {
-    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg) {
+    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, heroSprites) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.canvasCtx.mozImageSmoothingEnabled = false;
@@ -57,6 +75,7 @@ class GameState {
         this.tileSet = tileSet;
         this.tileMapInfo = tileMapInfo;
         this.barrierImg = barrierImg;
+        this.heroSprites = heroSprites;
 
         this.pixelsPerUnit = pixelsPerUnit;
         this.viewWidthInUnits = this.canvas.width / this.pixelsPerUnit;
@@ -65,7 +84,8 @@ class GameState {
         this.playerSpeed = 6.0;
         this.playerSize = 1.0;
         this.playerPos = this.tileMapInfo.start;
-        this.playerHeading = 0.0;
+        this.facingRight = true;
+        this.slashDirection = Directions.RIGHT;
 
         this.BPM = 4 * 120.0;
         this.SECONDS_PER_BEAT = 60.0 / this.BPM;
@@ -102,7 +122,6 @@ class GameState {
             this.enemies.push(makeDeadEnemy());
         }
 
-        this.controlDir = { x: 0.0, y: 0.0 };
         this.sustaining = false;
         this.scanning = false;
         // If >= 0.0, invuln until INVULN_TIME
@@ -188,8 +207,8 @@ class GameState {
             this.enemies[i] = enemy;
             return i;
         }
-        return -1;
         console.log("ran out of enemies");
+        return -1;
     }
 }
 
@@ -216,18 +235,61 @@ function drawSequence(canvasCtx, numBeats, currentBeatIx, canvasWidth, canvasHei
 
 function update(g, timeMillis) {
     kd.tick();
-    g.controlDir = { x: 0.0, y: 0.0 };
+    let controlDir = { x: 0.0, y: 0.0 };
     if (g.upPressed) {
-        g.controlDir.y -= 1.0;
+        controlDir.y -= 1.0;
     }
     if (g.downPressed) {
-        g.controlDir.y += 1.0;
+        controlDir.y += 1.0;
     }
     if (g.leftPressed) {
-        g.controlDir.x -= 1.0;
+        controlDir.x -= 1.0;
+        g.facingRight = false;
     }
     if (g.rightPressed) {
-        g.controlDir.x += 1.0;
+        controlDir.x += 1.0;
+        g.facingRight = true;
+    }
+
+    // Update slash direction
+    if (controlDir.x === 0.0) {
+        if (controlDir.y > 0.0) {
+            g.slashDirection = Directions.DOWN;
+        } else if (controlDir.y < 0.0) {
+            g.slashDirection = Directions.UP;
+        }
+    } else if (controlDir.y === 0.0) {
+        if (controlDir.x > 0.0) {
+            g.slashDirection = Directions.RIGHT;
+        } else if (controlDir.x < 0.0) {
+            g.slashDirection = Directions.LEFT;
+        }
+    } else {
+        switch (g.slashDirection) {
+            case Directions.RIGHT: {
+                if (controlDir.x < 0.0) {
+                    g.slashDirection = Directions.LEFT;
+                }
+                break;
+            }
+            case Directions.DOWN: {
+                if (controlDir.y < 0.0) {
+                    g.slashDirection = Directions.UP;
+                }
+                break;
+            }
+            case Directions.LEFT: {
+                if (controlDir.x > 0.0) {
+                    g.slashDirection = Directions.RIGHT;
+                }
+                break;
+            }
+            case Directions.UP: {
+                if (controlDir.y > 0.0) {
+                    g.slashDirection = Directions.DOWN;
+                }
+            }
+        }
     }
 
     if (g.prevTimeMillis < 0.0) {
@@ -296,7 +358,7 @@ function update(g, timeMillis) {
     let enemyHurtBoxes = [];
     let comboStart = false;
     if (doSlash || g.sustaining) {
-        let headingVec = unitVecFromAngle(g.playerHeading);
+        let headingVec = vecFromDirection(g.slashDirection);
         let hitBoxCenter = vecAdd(g.playerPos, vecScale(headingVec, g.playerSize));
         hitBox = getOOBBCornerPoints(hitBoxCenter, headingVec, 2*g.playerSize, g.playerSize);
 
@@ -421,14 +483,13 @@ function update(g, timeMillis) {
     let tileMap = g.tileMapInfo.info.layers[0];
 
     // Player position update
-    if (g.controlDir.x !== 0 || g.controlDir.y !== 0) {
+    if (controlDir.x !== 0 || controlDir.y !== 0) {
         let oldPos = g.playerPos;
         let newPos = vecAdd(
-            g.playerPos, vecScale(vecNormalized(g.controlDir), g.playerSpeed * dt));
+            g.playerPos, vecScale(vecNormalized(controlDir), g.playerSpeed * dt));
         if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.playerSize, g.tileMapInfo, g.tileSet)) {
             g.playerPos = newPos;
         }
-        g.playerHeading = Math.atan2(g.controlDir.y, g.controlDir.x);
     }
 
     // Enemy behavior update
@@ -441,8 +502,9 @@ function update(g, timeMillis) {
 
     // Handle player touching enemy
     if (g.invulnTimer < 0.0) {
+        // TODO: now that Player doesn't rotate, we should simplify the collision calculation.
         let playerHurtBox = getOOBBCornerPoints(
-            g.playerPos, unitVecFromAngle(g.playerHeading), g.playerSize, g.playerSize);
+            g.playerPos, {x: 1.0, y: 0.0}, g.playerSize, g.playerSize);
         for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
             let e = g.enemies[eIx];
             if (!e.alive) {
@@ -497,17 +559,27 @@ function update(g, timeMillis) {
     if (shouldDrawPlayer) {
         let playerPosPx = vecScale(g.playerPos, g.pixelsPerUnit);
         let playerSizePx = g.playerSize * g.pixelsPerUnit;
-        g.canvasCtx.save();
-        g.canvasCtx.fillStyle = 'red';
-        g.canvasCtx.translate(playerPosPx.x, playerPosPx.y);
-        g.canvasCtx.rotate(g.playerHeading);
-        g.canvasCtx.fillRect(-0.5*playerSizePx,
-                            -0.5*playerSizePx,
-                            playerSizePx, playerSizePx);
-        const EYE_SIZE = 0.25*playerSizePx;
-        g.canvasCtx.fillStyle = 'black';
-        g.canvasCtx.fillRect(0.5*playerSizePx - EYE_SIZE, -0.5*EYE_SIZE, EYE_SIZE, EYE_SIZE);
-        g.canvasCtx.restore();
+        let heroImg = null;
+        if (doSlash) {
+            if (g.facingRight) {
+                heroImg = g.heroSprites.slashRight;
+            } else {
+                heroImg = g.heroSprites.slashLeft;
+            }
+        } else if (controlDir.x === 0.0 && controlDir.y === 0.0) {
+            if (g.facingRight) {
+                heroImg = g.heroSprites.idleRight;
+            } else {
+                heroImg = g.heroSprites.idleLeft;
+            }
+        } else {
+            let anim = g.facingRight ? g.heroSprites.walkRightAnim : g.heroSprites.walkLeftAnim;
+            heroImg = anim[g.heroSprites.walkAnimFrames[g.currentBeatIx % 4]];
+        }
+        g.canvasCtx.drawImage(
+            heroImg,
+            Math.floor(playerPosPx.x - 0.5*playerSizePx), Math.floor(playerPosPx.y - 0.5*playerSizePx),
+            playerSizePx, playerSizePx);
     }
 
     // Draw Enemies
@@ -583,6 +655,49 @@ function update(g, timeMillis) {
 
     // Draw slash
     if (doSlash) {
+        let playerPosPx = vecScale(g.playerPos, g.pixelsPerUnit);
+        let playerSizePx = g.playerSize * g.pixelsPerUnit;
+        let slashSize = 1.0 * g.pixelsPerUnit;
+        let slashDist = 0.75 * playerSizePx;
+        let slashWidth = 2.0 * playerSizePx;
+        switch (g.slashDirection) {
+            case Directions.RIGHT: {
+                g.canvasCtx.drawImage(
+                    g.heroSprites.airSlashRight,
+                    Math.floor(playerPosPx.x + slashDist),
+                    Math.floor(playerPosPx.y - 0.5*slashWidth),
+                    slashSize, slashWidth);
+                break;
+            }
+            case Directions.DOWN: {
+                g.canvasCtx.drawImage(
+                    g.heroSprites.airSlashDown,
+                    Math.floor(playerPosPx.x - 0.5*slashWidth),
+                    Math.floor(playerPosPx.y + slashDist),
+                    slashWidth, slashSize);
+                break;
+            }
+            case Directions.LEFT: {
+                g.canvasCtx.drawImage(
+                    g.heroSprites.airSlashLeft,
+                    Math.floor(playerPosPx.x - (slashDist + playerSizePx)),
+                    Math.floor(playerPosPx.y - 0.5*slashWidth),
+                    slashSize, slashWidth);
+                break;
+            }
+            case Directions.UP: {
+                g.canvasCtx.drawImage(
+                    g.heroSprites.airSlashUp,
+                    Math.floor(playerPosPx.x - 0.5*slashWidth),
+                    Math.floor(playerPosPx.y - (slashDist + playerSizePx)),
+                    slashWidth, slashSize);
+                break;
+            }
+        }
+    }
+
+    // Draw slash hitbox
+    if (RENDER_HITBOX && doSlash) {
         g.canvas.strokeStyle = 'black';
         console.assert(hitBox !== null);
         let hbPx = [];
@@ -604,6 +719,36 @@ function update(g, timeMillis) {
     window.requestAnimationFrame((t) => update(g, t));
 }
 
+async function loadHeroSprites() {
+    let idleRight = await loadImgSync('sprites/hero-right.png');
+    let idleLeft = await loadImgSync('sprites/hero-left.png');
+    let walkRightAnim = [];
+    let walkLeftAnim = [];
+    for (let i = 1; i <= 3; ++i) {
+        walkRightAnim.push(await loadImgSync('sprites/walk-right-' + i + '.png'));
+        walkLeftAnim.push(await loadImgSync('sprites/walk-left-' + i + '.png'));
+    }
+    let slashLeft = await loadImgSync('sprites/slash-left.png');
+    let slashRight = await loadImgSync('sprites/slash-right.png');
+    let airSlashRight = await loadImgSync('sprites/air-slash/air-slash-right.png');
+    let airSlashLeft = await loadImgSync('sprites/air-slash/air-slash-left.png');
+    let airSlashUp = await loadImgSync('sprites/air-slash/air-slash-up.png');
+    let airSlashDown = await loadImgSync('sprites/air-slash/air-slash-down.png');
+    return {
+        idleLeft: idleLeft,
+        idleRight: idleRight,
+        walkLeftAnim: walkLeftAnim,
+        walkRightAnim: walkRightAnim,
+        walkAnimFrames: [0, 1, 2, 1],
+        slashLeft: slashLeft,
+        slashRight: slashRight,
+        airSlashLeft: airSlashLeft,
+        airSlashRight: airSlashRight,
+        airSlashUp: airSlashUp,
+        airSlashDown: airSlashDown,
+    };
+}
+
 async function main() {
     // Wait for user to press a key
     let msg = document.getElementById('message');
@@ -617,6 +762,9 @@ async function main() {
     msg.innerHTML = '';
 
     let sound = await initSound();
+    if (!ENABLE_SOUND) {
+        sound.masterGain.gain.value = 0.0;
+    }
     
     let pixelsPerUnit = 50;
 
@@ -624,17 +772,13 @@ async function main() {
     // let tileMapInfo = await loadTileMap('level1');
     let tileMapInfo = await loadTileMap('one_room_16x12');
 
-    let barrierImg = new Image();
-    const waitForImgLoad = () =>
-        new Promise((resolve) => {
-            barrierImg.addEventListener('load', () => resolve(), {once: true});
-        });
-    barrierImg.src = 'glass-glare-16x16.png';
-    await waitForImgLoad();
+    let barrierImg = await loadImgSync('glass-glare-16x16.png');
+
+    let heroSprites = await loadHeroSprites();
 
     let canvas = document.getElementById('canvas');
     
-    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg);
+    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, heroSprites);
 
     window.requestAnimationFrame((t) => update(gameState, t));
 }

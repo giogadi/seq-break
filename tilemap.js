@@ -16,17 +16,22 @@ function getJsonData(filename) {
     });
 }
 
+async function loadImgSync(filename) {
+    let img = new Image();
+    const waitForImgLoad = () =>
+        new Promise((resolve) => {
+            img.addEventListener('load', () => resolve(), {once: true});
+        });
+    img.src = filename;
+    await waitForImgLoad();
+    return img;
+}
+
 async function loadTileSet(name, desiredPixelsPerTile) {
     let filenamePrefix = "tiles/";
     let tileSetInfo = await getJsonData(filenamePrefix + name + '.json');
 
-    let tileSetImg = new Image();
-    const waitForImgLoad = () =>
-        new Promise((resolve) => {
-            tileSetImg.addEventListener('load', () => resolve(), {once: true});
-        });
-    tileSetImg.src = filenamePrefix + tileSetInfo.image;
-    await waitForImgLoad();
+    let tileSetImg = await loadImgSync(filenamePrefix + tileSetInfo.image);
 
     let ppt = desiredPixelsPerTile;
     let numTileRows = tileSetInfo.tilecount / tileSetInfo.columns;
