@@ -1,3 +1,10 @@
+class Vec2 {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
 function vecDot(u, v) {
     return u.x*v.x + u.y*v.y;
 }
@@ -34,9 +41,30 @@ function vecSub(u, v) {
     }
 }
 
+function vecClone(v) {
+    return { x: v.x, y: v.y };
+}
+
 // 90 degrees rotated counter-clockwise from v.
 function rotate90Ccw(v) {
     return { x: -v.y, y: v.x };
+}
+
+function randomUnitVec() {
+    let a = Math.random() * 2 * Math.PI;
+    return new Vec2(Math.cos(a), Math.sin(a));
+}
+
+class Bounds2 {
+    // Min and max are Vec2
+    constructor(min, max) {
+        this.min = min;
+        this.max = max;
+    }
+}
+
+function boundsClone(bounds) {
+    return new Bounds2(vecClone(bounds.min), vecClone(bounds.max));
 }
 
 function rand2dInBounds(bounds) {
@@ -44,6 +72,16 @@ function rand2dInBounds(bounds) {
         x: bounds.min.x + Math.random() * (bounds.max.x - bounds.min.x),
         y: bounds.min.y + Math.random() * (bounds.max.y - bounds.min.y)
     };
+}
+
+function boundsFromRect(center, width, height) {
+    let halfWidth = 0.5 * width;
+    let halfHeight = 0.5 * height;
+    return new Bounds2(
+        new Vec2(center.x - halfWidth,
+                 center.y - halfHeight),
+        new Vec2(center.x + halfWidth,
+                 center.y + halfHeight));
 }
 
 // Positive if point is on same side of plane as plane's normal vec
@@ -90,6 +128,13 @@ function doAABBsOverlap(center1, width1, height1, center2, width2, height2) {
         return false;
     }
     return true;
+}
+
+function doesBounds1ContainBounds2(bounds1, bounds2) {
+    return bounds1.min.x <= bounds2.min.x &&
+           bounds1.min.y <= bounds2.min.y &&
+           bounds1.max.x >= bounds2.max.x &&
+           bounds1.max.y >= bounds2.max.y;
 }
 
 function unitVecFromAngle(angle) {

@@ -1,6 +1,6 @@
 const ENABLE_SCANNING = false;
 const ENABLE_SUSTAINING = false;
-const ENABLE_SOUND = true;
+const ENABLE_SOUND = false;
 const RENDER_HITBOX = false;
 
 const SequenceType = {
@@ -63,6 +63,14 @@ function vecFromDirection(d) {
     }
 }
 
+function getCameraBounds(g) {
+    let halfWidth = g.viewWidthInUnits / 2.0;
+    let halfHeight = g.viewHeightInUnits / 2.0;
+    return new Bounds2(
+        new Vec2(g.cameraPos.x - halfWidth, g.cameraPos.y - halfHeight),
+        new Vec2(g.cameraPos.x + halfWidth, g.cameraPos.y + halfHeight));
+}
+
 class GameState {
     constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, heroSprites) {
         this.canvas = canvas;
@@ -86,6 +94,10 @@ class GameState {
         this.playerPos = this.tileMapInfo.start;
         this.facingRight = true;
         this.slashDirection = Directions.RIGHT;
+
+        this.cameraPos = vecClone(this.playerPos);
+        this.followPlayer = true;
+        this.limitPlayerToCamera = true;
 
         this.BPM = 4 * 120.0;
         this.SECONDS_PER_BEAT = 60.0 / this.BPM;
@@ -484,10 +496,11 @@ function update(g, timeMillis) {
 
     // Player position update
     if (controlDir.x !== 0 || controlDir.y !== 0) {
-        let oldPos = g.playerPos;
         let newPos = vecAdd(
             g.playerPos, vecScale(vecNormalized(controlDir), g.playerSpeed * dt));
-        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.playerSize, g.tileMapInfo, g.tileSet)) {
+        let newPlayerBounds = boundsFromRect(newPos, g.playerSize, g.playerSize);
+        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.playerSize, g.tileMapInfo, g.tileSet) &&
+             doesBounds1ContainBounds2(getCameraBounds(g), newPlayerBounds)) {
             g.playerPos = newPos;
         }
     }
@@ -529,14 +542,18 @@ function update(g, timeMillis) {
         }
     }
 
+    // Update camera position
+    if (g.followPlayer) {
+        g.cameraPos = g.playerPos;   
+    }
+
     g.canvasCtx.fillStyle = 'grey';
     g.canvasCtx.fillRect(0, 0, g.canvas.width, g.canvas.height);    
 
     // View transform
     g.canvasCtx.save();
     let centerPosPx = { x: Math.floor(0.5 * g.canvas.width), y: Math.floor(0.5 * g.canvas.height) };
-    let cameraPx = { x: Math.floor(g.playerPos.x * g.pixelsPerUnit), y: Math.floor(g.playerPos.y * g.pixelsPerUnit) };
-    // let cameraPx = centerPosPx;
+    let cameraPx = { x: Math.floor(g.cameraPos.x * g.pixelsPerUnit), y: Math.floor(g.cameraPos.y * g.pixelsPerUnit) };
     let centerToCamera = vecAdd(cameraPx, vecScale(centerPosPx, -1.0));
     g.canvasCtx.translate(-centerToCamera.x, -centerToCamera.y);
 
@@ -770,7 +787,8 @@ async function main() {
 
     let tileSet = await loadTileSet('dungeon_simple', pixelsPerUnit);
     // let tileMapInfo = await loadTileMap('level1');
-    let tileMapInfo = await loadTileMap('one_room_16x12');
+    // let tileMapInfo = await loadTileMap('one_room_16x12');
+    let tileMapInfo = await loadTileMap('prlevel1');
 
     let barrierImg = await loadImgSync('glass-glare-16x16.png');
 

@@ -14,6 +14,7 @@ function aabbCollidesWithSomeEnemy(center, width, height, enemies, ignoredEnemy 
 class Enemy {
     constructor(pos, sideLength, seq, sequenceId, color) {
         this.pos = pos;
+        this.v = new Vec2(0.0, 0.0);
         this.heading = 0.0;
         this.sideLength = sideLength;
         this.seq = seq;
@@ -22,9 +23,13 @@ class Enemy {
         this.renderLayer = 0;
         this.alive = true;
         this.hp = 1;
+
+        this.checkMapCollisions = false;
+        this.checkEnemyCollisions = false;
+        this.checkCameraCollisions = false;
+
         // If < 0, not in hit stun.
         this.hitStunTimer = -1.0;
-        this.knockBackVelocity = null;
         this.KNOCK_BACK_TIME = 0.1;
         this.POST_KNOCK_BACK_STUN_TIME = 0.2;
         this.BLINK_TIME = 0.1;
@@ -36,18 +41,24 @@ class Enemy {
             this.update(dt, g);
         } else {
             this.hitStunTimer += dt;
-            if (this.hitStunTimer < this.KNOCK_BACK_TIME) {
-                console.assert(this.knockBackVelocity !== null);
-                let newPos = vecAdd(this.pos, vecScale(this.knockBackVelocity, dt));
-                if (!isBoxInCollisionWithMap(newPos, this.sideLength, this.sideLength, g.tileMapInfo, g.tileSet) &&
-                    !aabbCollidesWithSomeEnemy(newPos, this.sideLength, this.sideLength, g.enemies, this)) {
-                        this.pos = newPos;
-                }
-            } else if (this.hitStunTimer < (this.KNOCK_BACK_TIME + this.POST_KNOCK_BACK_STUN_TIME)) {
-                this.knockBackVelocity = null;
-            } else {
+            if (this.hitStunTimer > (this.KNOCK_BACK_TIME + this.POST_KNOCK_BACK_STUN_TIME)) {
                 this.hitStunTimer = -1.0;
+            } else if (this.hitStunTimer > this.KNOCK_BACK_TIME) {
+                this.v = new Vec2(0.0, 0.0);
             }
+        }
+
+        this.updatePosition(dt, g);
+    }
+    updatePosition(dt, g) {
+        let newPos = vecAdd(this.pos, vecScale(this.v, dt));
+        let newBounds = boundsFromRect(newPos, this.sideLength, this.sideLength);
+        if ((this.checkMapCollisions && isBoxInCollisionWithMap(newPos, this.sideLength, this.sideLength, g.tileMapInfo, g.tileSet)) ||
+            (this.checkEnemyCollisions && aabbCollidesWithSomeEnemy(newPos, this.sideLength, this.sideLength, g.enemies, this)) ||
+            (this.checkCameraCollisions && !doesBounds1ContainBounds2(getCameraBounds(g), newBounds))) {
+            this.v = vecScale(this.v, -1.0);
+        } else {
+            this.pos = newPos;
         }
     }
     update(dt, gameState) {}
@@ -87,7 +98,7 @@ class Enemy {
         } else {
             this.hitStunTimer = 0.0;
             let knockBackDir = vecNormalized(vecSub(this.pos, playerPos));
-            this.knockBackVelocity = vecScale(knockBackDir, this.KNOCK_BACK_SPEED);
+            this.v = vecScale(knockBackDir, this.KNOCK_BACK_SPEED);
         }
     }
 }
@@ -96,71 +107,6 @@ function makeDeadEnemy() {
     let e = new Enemy({ x: 0.0, y: 0.0 }, 0.0, [], new SequenceId(SequenceType.SYNTH, 0), '');
     e.alive = false;
     return e;
-}
-
-class RhythmEnemyLogic {
-    constructor() {}
-    update(rhythmEnemy, gameState) {}
-}
-class RhythmEnemySetVelocity extends RhythmEnemyLogic {
-    constructor(v) {
-        super();
-        this.v = v;
-    }
-    update(rhythmEnemy, g) {
-        rhythmEnemy.v = this.v;
-    }
-}
-class RhythmEnemyRandomDirection extends RhythmEnemyLogic {
-    constructor(speed) {
-        super();
-        this.speed = speed;
-    }
-    update(rhythmEnemy, g) {
-        let a = Math.random() * 2 * Math.PI;
-        rhythmEnemy.v = { x: this.speed*Math.cos(a), y: this.speed*Math.sin(a) };
-    }
-}
-class RhythmEnemyShootHoming extends RhythmEnemyLogic {
-    constructor() {
-        super();
-    }
-    // TODO: now that bullets and enemies are all in the same "queue", we need to make sure
-    // that spawned bullets get updated on the same iteration they get spawned. This won't
-    // happen currently.
-    update(rhythmEnemy, g) {
-        g.spawnEnemy(new HomingBullet(rhythmEnemy.pos, 0.2*rhythmEnemy.sideLength));
-    }
-}
-
-// If you set the initBeatIx to < 0, that will delay actions until we get to 0.
-// A way to help sync up with another sequence.
-class RhythmEnemy extends Enemy {
-    constructor(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx = 0) {
-        super(pos, sideLength, soundSeq, sequenceId, color);
-        this.logicSeq = logicSeq;
-        this.v = { x: 0.0, y: 0.0 };
-        this.currentBeatIx = initBeatIx;
-    }
-    update(dt, g) {
-        if (g.newBeat) {
-            ++this.currentBeatIx;
-            if (this.currentBeatIx >= 0) {
-                this.currentBeatIx = this.currentBeatIx % this.logicSeq.length;
-                let logic = this.logicSeq[this.currentBeatIx];
-                for (let actionIx = 0; actionIx < logic.length; ++actionIx) {
-                    logic[actionIx].update(this, g);
-                }
-            }
-        }
-        let newPos = vecAdd(this.pos, vecScale(this.v, dt));
-        if (isBoxInCollisionWithMap(newPos, this.sideLength, this.sideLength, g.tileMapInfo, g.tileSet) ||
-            aabbCollidesWithSomeEnemy(newPos, this.sideLength, this.sideLength, g.enemies, this)) {
-            this.v = vecScale(this.v, -1.0);
-        } else {
-            this.pos = newPos;
-        }
-    }
 }
 
 // TODO: make this a RhythmEnemy
@@ -198,6 +144,9 @@ class HomingBullet extends Enemy {
             this.alive = false;
         }
     }
+    updatePosition(dt, g) {
+        // Override parent
+    }
 }
 
 // TODO: collision detection
@@ -224,6 +173,9 @@ class BigGuy extends Enemy {
         headingVec = unitVecFromAngle(this.heading);
         this.pos = vecAdd(this.pos, vecScale(headingVec, forwardSpeed * dt));
     }
+    updatePosition(dt, g) {
+        // Override parent class because this one is doing the pos updating.
+    }
     draw(canvasCtx, pixelsPerUnit) {
         let sizePx = this.sideLength * pixelsPerUnit;
         canvasCtx.fillStyle = this.color;
@@ -247,27 +199,95 @@ class BigGuy extends Enemy {
     }
 }
 
-function makeStationaryShooter(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0) {
-    // Note: new Array(16).fill([]) doesn't work because that assigns all the elements
-    // to the _same_ empty array!
-    let logicSeq = new Array(32);
-    for (let i = 0; i < logicSeq.length; ++i) {
-        logicSeq[i] = [];
+class NewRhythmEnemy extends Enemy {
+    constructor(pos, sideLength, soundSeq, sequenceId, color) {
+        super(pos, sideLength, soundSeq, sequenceId, color);
+        
     }
-    logicSeq[0].push(new RhythmEnemyShootHoming());
-    let e = new RhythmEnemy(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx); 
-    e.hp = 3;
-    return e;
+    update(dt, g) {
+        if (g.newBeat) {
+            this.beatUpdate(g);
+        }
+    }
+    beatUpdate(g) {}
 }
 
-function makeMover(pos, sideLength, soundSeq, sequenceId, color, initBeatIx = 0) {
-    let logicSeq = new Array(4);
-    for (let i = 0; i < logicSeq.length; ++i) {
-        logicSeq[i] = [];
+class Buzzer extends NewRhythmEnemy {
+    constructor(pos, sideLength, soundSeq, sequenceId, color, initState = 0) {
+        super(pos, sideLength, soundSeq, sequenceId, color);
+        this.state = initState;
     }
-    logicSeq[0].push(new RhythmEnemySetVelocity({ x: 0.0, y: 0.0 }));
-    logicSeq[2].push(new RhythmEnemyRandomDirection(3.0));
-    let e = new RhythmEnemy(pos, sideLength, soundSeq, sequenceId, color, logicSeq, initBeatIx);
-    e.hp = 2;
-    return e;
+    static speed = 5.0;
+    beatUpdate(g) {
+        switch (this.state) {
+            case 0: {
+                this.v = new Vec2(0.0, 0.0);
+                break;
+            }
+            case 2: {
+                let zigAngle = (Math.PI / 180.0) * 20.0;
+                let zigVec = unitVecFromAngle(0.5 * Math.PI - zigAngle);
+                this.v = vecScale(zigVec, Buzzer.speed);
+                break;
+            }
+            case 4: {
+                this.v = new Vec2(0.0, 0.0);
+                break;
+            }
+            case 6: {
+                let zagAngle = (Math.PI / 180.0) * 20.0;
+                let zagVec = unitVecFromAngle(0.5 * Math.PI + zagAngle);
+                this.v = vecScale(zagVec, Buzzer.speed);
+                break;
+            }
+            case 7: {
+                this.state = -1;
+            }
+            default: {
+
+            }
+        }
+        ++this.state;
+    }
+}
+
+class Biggie extends NewRhythmEnemy {
+    constructor(pos, sideLength, soundSeq, sequenceId, color, initState = 0) {
+        super(pos, sideLength, soundSeq, sequenceId, color);
+        this.state = initState;
+    }
+    static speed = 3.0;
+    beatUpdate(g) {
+        switch (this.state) {
+            case 0: {
+                this.v = new Vec2(0.0, Biggie.speed);
+                break;
+            }
+            case 4: {
+                this.v = new Vec2(0.0, 0.0);
+                let cameraBounds = getCameraBounds(g);
+                cameraBounds.min.y += 1.5;
+                let enemyBounds = boundsFromRect(this.pos, this.sideLength, this.sideLength);
+                if (doesBounds1ContainBounds2(cameraBounds, enemyBounds)) {
+                    this.checkMapCollisions = true;
+                    this.checkCameraCollisions = true;
+                    this.state = 7;
+                } else {
+                    this.state = -5;
+                }
+                break;
+            }
+            case 12: {
+                this.v = vecScale(randomUnitVec(), Biggie.speed);
+                break;
+            }
+            case 16: {
+                this.v = new Vec2(0.0, 0.0);
+                this.state = 7;
+                break;
+            }
+            default: {}
+        }
+        ++this.state;
+    }
 }

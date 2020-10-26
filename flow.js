@@ -90,3 +90,36 @@ class WaitForLoopStart extends GameTask {
         return gameState.newBeat && gameState.currentBeatIx === 0;
     }
 }
+
+class LockCamera extends GameTask {
+    update(gameState, dt) {
+        gameState.followPlayer = false;
+        return true;
+    }
+}
+
+class UnlockCamera extends GameTask {
+    update(gameState, dt) {
+        gameState.followPlayer = true;
+        return true;
+    }
+}
+
+class SpawnEnemyNew extends GameTask {
+    constructor(enemy) {
+        super();
+        this.enemy = enemy;
+    }
+    update(gameState, dt) {
+        gameState.spawnEnemy(this.enemy);
+        return true;
+    }
+}
+
+class SetStandardKickPattern extends GameTask {
+    update(gameState, dt) {
+        let kickIx = 0;
+        gameState.sampleSequences[kickIx][0].freq = gameState.sampleSequences[kickIx][4].freq = gameState.sampleSequences[kickIx][8].freq = gameState.sampleSequences[kickIx][12].freq = 0;
+        return true;
+    }
+}
