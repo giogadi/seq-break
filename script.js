@@ -72,7 +72,7 @@ function getCameraBounds(g) {
 }
 
 class GameState {
-    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, heroSprites) {
+    constructor(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, sprites) {
         this.canvas = canvas;
         this.canvasCtx = canvas.getContext('2d');
         this.canvasCtx.mozImageSmoothingEnabled = false;
@@ -83,7 +83,7 @@ class GameState {
         this.tileSet = tileSet;
         this.tileMapInfo = tileMapInfo;
         this.barrierImg = barrierImg;
-        this.heroSprites = heroSprites;
+        this.sprites = sprites;
 
         this.pixelsPerUnit = pixelsPerUnit;
         this.viewWidthInUnits = this.canvas.width / this.pixelsPerUnit;
@@ -146,6 +146,11 @@ class GameState {
         this.slashCooldownBeatsRemaining = 0;
 
         this.prevTimeMillis = -1.0;
+
+        this.entities = [];
+        for (let i = 0; i < 10; ++i) {
+            this.entities.push(new Entity());
+        }
 
         this.taskList = [];
         for (let i = 0; i < this.tileMapInfo.rooms.length; ++i) {
@@ -220,6 +225,18 @@ class GameState {
             return i;
         }
         console.log("ran out of enemies");
+        return -1;
+    }
+    spawnEntity(entity) {
+        for (let i = 0; i < this.entities.length; ++i) {
+            let e = this.entities[i];
+            if (e.alive) {
+                continue;
+            }
+            this.entities[i] = entity;
+            return i;
+        }
+        console.log("ran out of entitites");
         return -1;
     }
 }
@@ -579,19 +596,19 @@ function update(g, timeMillis) {
         let heroImg = null;
         if (doSlash) {
             if (g.facingRight) {
-                heroImg = g.heroSprites.slashRight;
+                heroImg = g.sprites.slashRight;
             } else {
-                heroImg = g.heroSprites.slashLeft;
+                heroImg = g.sprites.slashLeft;
             }
         } else if (controlDir.x === 0.0 && controlDir.y === 0.0) {
             if (g.facingRight) {
-                heroImg = g.heroSprites.idleRight;
+                heroImg = g.sprites.idleRight;
             } else {
-                heroImg = g.heroSprites.idleLeft;
+                heroImg = g.sprites.idleLeft;
             }
         } else {
-            let anim = g.facingRight ? g.heroSprites.walkRightAnim : g.heroSprites.walkLeftAnim;
-            heroImg = anim[g.heroSprites.walkAnimFrames[g.currentBeatIx % 4]];
+            let anim = g.facingRight ? g.sprites.walkRightAnim : g.sprites.walkLeftAnim;
+            heroImg = anim[g.sprites.walkAnimFrames[g.currentBeatIx % 4]];
         }
         g.canvasCtx.drawImage(
             heroImg,
@@ -680,7 +697,7 @@ function update(g, timeMillis) {
         switch (g.slashDirection) {
             case Directions.RIGHT: {
                 g.canvasCtx.drawImage(
-                    g.heroSprites.airSlashRight,
+                    g.sprites.airSlashRight,
                     Math.floor(playerPosPx.x + slashDist),
                     Math.floor(playerPosPx.y - 0.5*slashWidth),
                     slashSize, slashWidth);
@@ -688,7 +705,7 @@ function update(g, timeMillis) {
             }
             case Directions.DOWN: {
                 g.canvasCtx.drawImage(
-                    g.heroSprites.airSlashDown,
+                    g.sprites.airSlashDown,
                     Math.floor(playerPosPx.x - 0.5*slashWidth),
                     Math.floor(playerPosPx.y + slashDist),
                     slashWidth, slashSize);
@@ -696,7 +713,7 @@ function update(g, timeMillis) {
             }
             case Directions.LEFT: {
                 g.canvasCtx.drawImage(
-                    g.heroSprites.airSlashLeft,
+                    g.sprites.airSlashLeft,
                     Math.floor(playerPosPx.x - (slashDist + playerSizePx)),
                     Math.floor(playerPosPx.y - 0.5*slashWidth),
                     slashSize, slashWidth);
@@ -704,7 +721,7 @@ function update(g, timeMillis) {
             }
             case Directions.UP: {
                 g.canvasCtx.drawImage(
-                    g.heroSprites.airSlashUp,
+                    g.sprites.airSlashUp,
                     Math.floor(playerPosPx.x - 0.5*slashWidth),
                     Math.floor(playerPosPx.y - (slashDist + playerSizePx)),
                     slashWidth, slashSize);
@@ -731,12 +748,20 @@ function update(g, timeMillis) {
 
     g.canvasCtx.restore();
 
+    for (let i = 0; i < g.entities.length; ++i) {
+        let e = g.entities[i];
+        if (!e.alive) {
+            continue;
+        }
+        e.update(g);
+    }
+
     drawSequence(g.canvasCtx, g.NUM_BEATS, g.currentBeatIx, g.canvas.width, g.canvas.height);
 
     window.requestAnimationFrame((t) => update(g, t));
 }
 
-async function loadHeroSprites() {
+async function loadSprites() {
     let idleRight = await loadImgSync('sprites/hero-right.png');
     let idleLeft = await loadImgSync('sprites/hero-left.png');
     let walkRightAnim = [];
@@ -751,6 +776,7 @@ async function loadHeroSprites() {
     let airSlashLeft = await loadImgSync('sprites/air-slash/air-slash-left.png');
     let airSlashUp = await loadImgSync('sprites/air-slash/air-slash-up.png');
     let airSlashDown = await loadImgSync('sprites/air-slash/air-slash-down.png');
+    let itte = await loadImgSync('sprites/itte.png');
     return {
         idleLeft: idleLeft,
         idleRight: idleRight,
@@ -763,6 +789,7 @@ async function loadHeroSprites() {
         airSlashRight: airSlashRight,
         airSlashUp: airSlashUp,
         airSlashDown: airSlashDown,
+        itte: itte
     };
 }
 
@@ -792,11 +819,11 @@ async function main() {
 
     let barrierImg = await loadImgSync('glass-glare-16x16.png');
 
-    let heroSprites = await loadHeroSprites();
+    let sprites = await loadSprites();
 
     let canvas = document.getElementById('canvas');
     
-    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, heroSprites);
+    let gameState = new GameState(canvas, sound, tileSet, pixelsPerUnit, tileMapInfo, barrierImg, sprites);
 
     window.requestAnimationFrame((t) => update(gameState, t));
 }

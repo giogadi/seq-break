@@ -123,3 +123,58 @@ class SetStandardKickPattern extends GameTask {
         return true;
     }
 }
+
+class WaitNumBeats extends GameTask {
+    constructor(numBeats) {
+        super();
+        this.numBeats = numBeats;
+    }
+    update(gameState, dt) {
+        if (gameState.newBeat) {
+            --this.numBeats;
+        }
+        return this.numBeats <= 0;
+    }
+}
+
+class Entity {
+    constructor() {
+        this.alive = false;
+    }
+    update(g) {}
+    draw(g) {}
+}
+
+class ItteSign extends Entity {
+    constructor() {
+        super();
+        this.alive = true;
+        this.beatsAlive = 0;
+        this.shouldDraw = false;
+    }
+    update(g) {
+        if (g.newBeat) {
+            ++this.beatsAlive;
+            if (this.beatsAlive > 32) {
+                this.alive = false;
+                return;
+            }
+            if (this.beatsAlive % 4 === 0) {
+                this.shouldDraw = !this.shouldDraw;
+            }
+        }
+        if (this.shouldDraw) {
+            g.canvasCtx.drawImage(
+                g.sprites.itte,
+                Math.floor(0.2 * g.canvas.width), Math.floor(0.1 * g.canvas.height),
+                4 * g.pixelsPerUnit, 2 * g.pixelsPerUnit);
+        }
+    }
+}
+
+class SpawnItteSign extends GameTask {
+    update(g, dt) {
+        g.spawnEntity(new ItteSign());
+        return true;
+    }
+}

@@ -27,6 +27,76 @@ function getDownBeatDelay(currentBeatIx) {
     return delayBeats;
 }
 
+class BiggieAndCrissCrossBuzzers extends GameTask {
+    constructor() {
+        super();
+        this.state = 0;
+        this.biggieIx = -1;
+    }
+    update(gameState, dt) {
+        if (!gameState.newBeat) {
+            return false;
+        }
+        let done = false;
+        switch (this.state) {
+            case 0: {
+                const biggieSideLength = 3.0;
+                let biggieSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
+                let biggieSeqId = new SequenceId(SequenceType.SYNTH, 0);
+                let b = new Biggie(
+                    new Vec2(11.0, 16.0), biggieSideLength, biggieSoundSeq, biggieSeqId, 'green');
+                b.hp = 5;
+                this.biggieIx = gameState.spawnEnemy(b);
+                break;
+            }
+            case 24: {
+                let buzzerSideLength = 0.5;
+                let buzzerSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
+                let buzzerSeqId = new SequenceId(SequenceType.SYNTH, 0);
+
+                let halfDims = new Vec2(0.3 * gameState.viewWidthInUnits, 0.3 * gameState.viewHeightInUnits);
+                let spawnBounds = new Bounds2(vecSub(gameState.cameraPos, halfDims), vecAdd(gameState.cameraPos, halfDims));
+                let randPt = rand2dInBounds(spawnBounds);
+                let cameraBounds = getCameraBounds(gameState);
+
+                let spawnPt = new Vec2(cameraBounds.min.x - 1.0, randPt.y);
+                for (let i = 0; i < 4; ++i) {
+                    let initState = (i % 2 === 0) ? 4 : 0;
+                    let e = new Buzzer(
+                        vecClone(spawnPt), buzzerSideLength, buzzerSoundSeq,
+                        buzzerSeqId, 'yellow', initState);
+                    e.mainAngle = 0.0;
+                    e.speed = 10.0;
+                    gameState.spawnEnemy(e);
+                    spawnPt.x -= 2.0;
+                }
+
+                spawnPt = new Vec2(randPt.x, cameraBounds.min.y - 1.0);
+                for (let i = 0; i < 4; ++i) {
+                    let initState = (i % 2 === 0) ? 0 : 4;
+                    let e = new Buzzer(
+                        vecClone(spawnPt), buzzerSideLength, buzzerSoundSeq,
+                        buzzerSeqId, 'yellow', initState);
+                    e.speed = 10.0;
+                    gameState.spawnEnemy(e);
+                    spawnPt.y -= 2.0;
+                }
+                break;
+            }
+            case 48: {
+                if (gameState.enemies[this.biggieIx].alive) {
+                    this.state = 23;
+                } else {
+                    done = true;
+                }
+                break;
+            }
+        }
+        ++this.state;
+        return done;
+    }
+}
+
 function PRLevel1TaskList() {
     let taskList = [];
 
@@ -61,15 +131,11 @@ function PRLevel1TaskList() {
 
     taskList.push(new LockCamera());
 
-    {
-        const biggieSideLength = 3.0;
-        let biggieSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
-        let biggieSeqId = new SequenceId(SequenceType.SYNTH, 0);
-        let b = new Biggie(
-            new Vec2(11.0, 16.0), biggieSideLength, biggieSoundSeq, biggieSeqId, 'green');
-        b.hp = 5;
-        taskList.push(new SpawnEnemyNew(b));
-    }
+    taskList.push(new BiggieAndCrissCrossBuzzers());
+
+    taskList.push(new SpawnItteSign());
+
+    taskList.push(new UnlockCamera());
 
     return taskList;
 }

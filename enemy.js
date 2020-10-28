@@ -216,18 +216,39 @@ class Buzzer extends NewRhythmEnemy {
     constructor(pos, sideLength, soundSeq, sequenceId, color, initState = 0) {
         super(pos, sideLength, soundSeq, sequenceId, color);
         this.state = initState;
+        this.mainAngle = 0.5 * Math.PI;
+        this.zigAngle = (Math.PI / 180.0) * 20.0;
+        this.speed = 5.0;
+        this.hasEnteredScene = false;
+        this.beatsOutsideScene = 0;
     }
-    static speed = 5.0;
     beatUpdate(g) {
+        let inBounds = isPointInBounds(this.pos, getCameraBounds(g));
+        if (this.hasEnteredScene) {
+            if (!inBounds) {
+                this.alive = false;
+                return;
+            }
+        } else {
+            if (inBounds) {
+                this.hasEnteredScene = true;
+            } else {
+                ++this.beatsOutsideScene;
+                if (this.beatsOutsideScene > 60) {
+                    console.log("enemy never showed");
+                    this.alive = false;
+                    return;
+                }
+            }
+        }
         switch (this.state) {
             case 0: {
                 this.v = new Vec2(0.0, 0.0);
                 break;
             }
             case 2: {
-                let zigAngle = (Math.PI / 180.0) * 20.0;
-                let zigVec = unitVecFromAngle(0.5 * Math.PI - zigAngle);
-                this.v = vecScale(zigVec, Buzzer.speed);
+                let zigVec = unitVecFromAngle(this.mainAngle - this.zigAngle);
+                this.v = vecScale(zigVec, this.speed);
                 break;
             }
             case 4: {
@@ -235,9 +256,8 @@ class Buzzer extends NewRhythmEnemy {
                 break;
             }
             case 6: {
-                let zagAngle = (Math.PI / 180.0) * 20.0;
-                let zagVec = unitVecFromAngle(0.5 * Math.PI + zagAngle);
-                this.v = vecScale(zagVec, Buzzer.speed);
+                let zigVec = unitVecFromAngle(this.mainAngle + this.zigAngle);
+                this.v = vecScale(zigVec, this.speed);
                 break;
             }
             case 7: {
@@ -256,7 +276,7 @@ class Biggie extends NewRhythmEnemy {
         super(pos, sideLength, soundSeq, sequenceId, color);
         this.state = initState;
     }
-    static speed = 3.0;
+    static speed = 5.0;
     beatUpdate(g) {
         switch (this.state) {
             case 0: {
