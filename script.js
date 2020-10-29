@@ -47,13 +47,6 @@ function createConstantSequence(numBeats, freq, loopsUntilGone = 0) {
     return sequence;
 }
 
-const Directions = {
-    RIGHT: 0,
-    DOWN: 1,
-    LEFT: 2,
-    UP: 3
-};
-
 function vecFromDirection(d) {
     switch (d) {
         case Directions.RIGHT: return { x: 1.0, y: 0.0 };
@@ -792,7 +785,10 @@ async function loadSprites() {
     let airSlashLeft = await loadImgSync('sprites/air-slash/air-slash-left.png');
     let airSlashUp = await loadImgSync('sprites/air-slash/air-slash-up.png');
     let airSlashDown = await loadImgSync('sprites/air-slash/air-slash-down.png');
-    let itte = await loadImgSync('sprites/itte.png');
+    let itteLeft = await loadImgSync('sprites/itte_left.png');
+    let itteUp = await loadImgSync('sprites/itte_up.png');
+    let itteRight = await loadImgSync('sprites/itte_right.png');
+    let itteDown = await loadImgSync('sprites/itte_down.png');
     return {
         idleLeft: idleLeft,
         idleRight: idleRight,
@@ -805,7 +801,10 @@ async function loadSprites() {
         airSlashRight: airSlashRight,
         airSlashUp: airSlashUp,
         airSlashDown: airSlashDown,
-        itte: itte
+        itteLeft: itteLeft,
+        itteUp: itteUp,
+        itteRight: itteRight,
+        itteDown: itteDown
     };
 }
 

@@ -135,7 +135,7 @@ function PRLevel1TaskList() {
 
     taskList.push(new BiggieAndCrissCrossBuzzers());
 
-    taskList.push(new SpawnItteSign());
+    taskList.push(new SpawnItteSign(Directions.UP));
 
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, true, true)));
 

@@ -152,8 +152,9 @@ class Entity {
 }
 
 class ItteSign extends Entity {
-    constructor() {
+    constructor(direction) {
         super();
+        this.direction = direction;
         this.alive = true;
         this.beatsAlive = 0;
         this.shouldDraw = false;
@@ -170,8 +171,15 @@ class ItteSign extends Entity {
             }
         }
         if (this.shouldDraw) {
+            let img = null;
+            switch(this.direction) {
+                case Directions.UP: img = g.sprites.itteUp; break;
+                case Directions.RIGHT: img = g.sprites.itteRight; break;
+                case Directions.DOWN: img = g.sprites.itteDown; break;
+                case Directions.LEFT: img = g.sprites.itteLeft; break;
+            }
             g.canvasCtx.drawImage(
-                g.sprites.itte,
+                img,
                 Math.floor(0.2 * g.canvas.width), Math.floor(0.1 * g.canvas.height),
                 4 * g.pixelsPerUnit, 2 * g.pixelsPerUnit);
         }
@@ -179,8 +187,12 @@ class ItteSign extends Entity {
 }
 
 class SpawnItteSign extends GameTask {
+    constructor(direction) {
+        super();
+        this.direction = direction;
+    }
     update(g, dt) {
-        g.spawnEntity(new ItteSign());
+        g.spawnEntity(new ItteSign(this.direction));
         return true;
     }
 }
