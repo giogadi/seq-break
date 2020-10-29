@@ -52,7 +52,7 @@ const Directions = {
     DOWN: 1,
     LEFT: 2,
     UP: 3
-}
+};
 
 function vecFromDirection(d) {
     switch (d) {
@@ -96,7 +96,7 @@ class GameState {
         this.slashDirection = Directions.RIGHT;
 
         this.cameraPos = vecClone(this.playerPos);
-        this.followPlayer = true;
+        this.cameraFollowMode = new CameraFollowMode(true, true, true, true);
         this.limitPlayerToCamera = true;
 
         this.BPM = 4 * 120.0;
@@ -560,8 +560,24 @@ function update(g, timeMillis) {
     }
 
     // Update camera position
-    if (g.followPlayer) {
-        g.cameraPos = g.playerPos;   
+    let maxCameraMove = g.playerSpeed * dt;
+    if ((g.playerPos.x > g.cameraPos.x && g.cameraFollowMode.followPlusX) ||
+        (g.playerPos.x < g.cameraPos.x && g.cameraFollowMode.followMinusX)) {
+        let d = g.playerPos.x - g.cameraPos.x;
+        if (Math.abs(d) <= maxCameraMove) {
+            g.cameraPos.x = g.playerPos.x;
+        } else {
+            g.cameraPos.x += Math.sign(d) * maxCameraMove;
+        }
+    }
+    if ((g.playerPos.y > g.cameraPos.y && g.cameraFollowMode.followPlusY) ||
+        (g.playerPos.y < g.cameraPos.y && g.cameraFollowMode.followMinusY)) {
+        let d = g.playerPos.y - g.cameraPos.y;
+        if (Math.abs(d) <= maxCameraMove) {
+            g.cameraPos.y = g.playerPos.y;
+        } else {
+            g.cameraPos.y += Math.sign(d) * maxCameraMove;
+        }
     }
 
     g.canvasCtx.fillStyle = 'grey';

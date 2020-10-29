@@ -100,6 +100,8 @@ class BiggieAndCrissCrossBuzzers extends GameTask {
 function PRLevel1TaskList() {
     let taskList = [];
 
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, true, true)));
+
     taskList.push(new SetStandardKickPattern());
     
     const buzzerSideLength = 0.5;
@@ -129,13 +131,13 @@ function PRLevel1TaskList() {
         new Bounds2(new Vec2(0, 22.5), new Vec2(23, 23.5))
     ));
 
-    taskList.push(new LockCamera());
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
 
     taskList.push(new BiggieAndCrissCrossBuzzers());
 
     taskList.push(new SpawnItteSign());
 
-    taskList.push(new UnlockCamera());
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, true, true)));
 
     return taskList;
 }

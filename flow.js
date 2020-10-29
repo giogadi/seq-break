@@ -91,16 +91,22 @@ class WaitForLoopStart extends GameTask {
     }
 }
 
-class LockCamera extends GameTask {
-    update(gameState, dt) {
-        gameState.followPlayer = false;
-        return true;
+class CameraFollowMode {
+    constructor(followPlusX, followMinusX, followPlusY, followMinusY) {
+        this.followPlusX = followPlusX;
+        this.followMinusX = followMinusX;
+        this.followPlusY = followPlusY;
+        this.followMinusY = followMinusY;
     }
 }
 
-class UnlockCamera extends GameTask {
+class SetCameraFollowMode extends GameTask {
+    constructor(cameraFollowMode) {
+        super();
+        this.cameraFollowMode = cameraFollowMode;
+    }
     update(gameState, dt) {
-        gameState.followPlayer = true;
+        gameState.cameraFollowMode = this.cameraFollowMode;
         return true;
     }
 }
