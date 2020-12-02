@@ -43,7 +43,6 @@ function makeRandomEnemies(g, bounds) {
     }
 
     // Movers
-    // possibleNotes = [NOTES.C, NOTES.E, NOTES.G, NOTES.B_F];
     possibleNotes = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A];
     numEnemies = Math.random() * 8;
     enemySize = 1.0;

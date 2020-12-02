@@ -145,17 +145,23 @@ class WaitNumBeats extends GameTask {
 
 class Entity {
     constructor() {
-        this.alive = false;
+        this.alive = true;
+        this.screenSpace = false;
     }
     update(g) {}
-    draw(g) {}
+}
+
+function createDeadEntity() {
+    let e = new Entity();
+    e.alive = false;
+    return e;
 }
 
 class ItteSign extends Entity {
     constructor(direction) {
         super();
         this.direction = direction;
-        this.alive = true;
+        this.screenSpace = true;
         this.beatsAlive = 0;
         this.shouldDraw = false;
     }
@@ -193,6 +199,59 @@ class SpawnItteSign extends GameTask {
     }
     update(g, dt) {
         g.spawnEntity(new ItteSign(this.direction));
+        return true;
+    }
+}
+
+class ChoiceSwitchSpec {
+    constructor(bounds, color, seqId, beatIx, freq) {
+        this.bounds = bounds;
+        this.color = color;
+        this.seqId = seqId;
+        this.beatIx = beatIx;
+        this.freq = freq;
+    }
+}
+
+class ChoiceSwitchSet extends Entity {
+    constructor(switchSpecs) {
+        super();
+        this.switches = switchSpecs;
+        this.selectedIx = -1;
+    }
+    update(g, dt) {
+        if (this.selectedIx < 0) {
+            for (let i = 0; i < this.switches.length; ++i) {
+                let s = this.switches[i];
+                if (isPointInBounds(g.playerPos, s.bounds)) {
+                    let seq = g.getSequence(s.seqId);
+                    seq[s.beatIx].freq = seq[s.beatIx + 8].freq = s.freq;
+                    this.selectedIx = i;
+                    break;
+                }
+            }
+        }
+
+        if (this.selectedIx >= 0) {
+            let s = this.switches[this.selectedIx];
+            g.canvasCtx.fillStyle = s.color;
+            g.canvasCtx.globalAlpha = 0.25;
+            g.canvasCtx.fillRect(
+                s.bounds.min.x * g.pixelsPerUnit, s.bounds.min.y * g.pixelsPerUnit,
+                (s.bounds.max.x - s.bounds.min.x) * g.pixelsPerUnit,
+                (s.bounds.max.y - s.bounds.min.y) * g.pixelsPerUnit);
+            g.canvasCtx.globalAlpha = 1.0;
+        }
+    }
+}
+
+class SpawnChoiceSwitchSet extends GameTask {
+    constructor(switchSpecs) {
+        super();
+        this.switchSpecs = switchSpecs;
+    }
+    update(g, dt) {
+        g.spawnEntity(new ChoiceSwitchSet(this.switchSpecs));
         return true;
     }
 }

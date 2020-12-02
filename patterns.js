@@ -41,18 +41,24 @@ class BiggieAndCrissCrossBuzzers extends GameTask {
         switch (this.state) {
             case 0: {
                 const biggieSideLength = 3.0;
-                let biggieSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
-                let biggieSeqId = new SequenceId(SequenceType.SYNTH, 0);
+                let biggieSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 1));
+                let biggieSeqId = new SequenceId(SequenceType.SYNTH, 3);  // BASS
+                let bounds = getCameraBounds(gameState);
+                let biggiePos = new Vec2(bounds.max.x + 2*biggieSideLength, gameState.cameraPos.y);
                 let b = new Biggie(
-                    new Vec2(11.0, 16.0), biggieSideLength, biggieSoundSeq, biggieSeqId, 'green');
+                    biggiePos, biggieSideLength, biggieSoundSeq, biggieSeqId, 'green');
                 b.hp = 5;
                 this.biggieIx = gameState.spawnEnemy(b);
                 break;
             }
             case 24: {
                 let buzzerSideLength = 0.5;
-                let buzzerSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
                 let buzzerSeqId = new SequenceId(SequenceType.SYNTH, 0);
+                let possibleFreqs = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A].map(x => getFreq(x, 4));
+                let buzzerSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
+                for (let i = 0; i < buzzerSoundSeq.length; ++i) {
+                    buzzerSoundSeq[i].freq = possibleFreqs[i % possibleFreqs.length];
+                }                
 
                 let halfDims = new Vec2(0.3 * gameState.viewWidthInUnits, 0.3 * gameState.viewHeightInUnits);
                 let spawnBounds = new Bounds2(vecSub(gameState.cameraPos, halfDims), vecAdd(gameState.cameraPos, halfDims));
@@ -97,18 +103,23 @@ class BiggieAndCrissCrossBuzzers extends GameTask {
     }
 }
 
-function PRLevel1TaskList() {
+// TODO: Change the "static" spawn points to hard-coded into one task, not separate tasks.
+function PRLevel1TaskList(gameState) {
     let taskList = [];
 
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, true, true)));
 
     taskList.push(new SetStandardKickPattern());
     
+    let possibleFreqs = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A].map(x => getFreq(x, 4));
     const buzzerSideLength = 0.5;
     let buzzerSoundSeq = createConstantSequence(16, getFreq(NOTES.C, 4));
+    for (let i = 0; i < buzzerSoundSeq.length; ++i) {
+        buzzerSoundSeq[i].freq = possibleFreqs[i % possibleFreqs.length];
+    }
     let buzzerSeqId = new SequenceId(SequenceType.SYNTH, 0);
     let spawnPt = { x: 11, y: 27.0 };
-    for (let i = 0; i < 8; ++i) {
+    for (let i = 0; i < 6; ++i) {
         let initBeatIx = (i % 2 === 0) ? 0 : 4;
         let e = new Buzzer(
             vecClone(spawnPt), buzzerSideLength, buzzerSoundSeq,
@@ -118,7 +129,7 @@ function PRLevel1TaskList() {
     }
 
     spawnPt = { x: 13, y: 26.0 };
-    for (let i = 0; i < 8; ++i) {
+    for (let i = 0; i < 6; ++i) {
         let initBeatIx = (i % 2 === 0) ? 4 : 0;
         let e = new Buzzer(
             vecClone(spawnPt), buzzerSideLength, buzzerSoundSeq,
@@ -127,36 +138,64 @@ function PRLevel1TaskList() {
         spawnPt.y -= 2.0;
     }
 
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(11.5, 25.5), gameState.sprites.firewheel, 8, 0, 4, true)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(12.5, 25.5), gameState.sprites.firewheel, 8, 4, 7, false)));
+
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(9.5, 22.5), gameState.sprites.firewheel, 8, 0, 4, true)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(10.5, 22.5), gameState.sprites.firewheel, 8, 0, 4, false)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(11.5, 22.5), gameState.sprites.firewheel, 8, 0, 4, true)));
+
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(11.5, 19.5), gameState.sprites.firewheel, 16, 0, 4, false)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(12.5, 19.5), gameState.sprites.firewheel, 16, 4, 8)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(13.5, 19.5), gameState.sprites.firewheel, 16, 8, 12)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(14.5, 19.5), gameState.sprites.firewheel, 16, 12, 0, true)));
+
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(14.5, 16.5), gameState.sprites.firewheel, 12, 2, 6, true)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(15.5, 16.5), gameState.sprites.firewheel, 12, 6, 10, true)));
+    taskList.push(new SpawnEnemyNew(new Firewheel(new Vec2(16.5, 16.5), gameState.sprites.firewheel, 12, 10, 2, false)));
+
+    possibleFreqs = [NOTES.C, NOTES.D, NOTES.F, NOTES.G, NOTES.A].map(x => getFreq(x, 1));
+    const seqId = new SequenceId(SequenceType.SYNTH, 1);
+
+    taskList.push(new SpawnChoiceSwitchSet(
+        [new ChoiceSwitchSpec(boundsFromCellIndex(11, 25), "red", seqId, 0, possibleFreqs[0]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(12, 25), "blue", seqId, 0, possibleFreqs[1])]
+    ));
+
+    taskList.push(new SpawnChoiceSwitchSet(
+        [new ChoiceSwitchSpec(boundsFromCellIndex(9, 22), "red", seqId, 2, possibleFreqs[0]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(10, 22), "blue", seqId, 2, possibleFreqs[1]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(11, 22), "green", seqId, 2, possibleFreqs[2])]
+    ));
+
+    taskList.push(new SpawnChoiceSwitchSet(
+        [new ChoiceSwitchSpec(boundsFromCellIndex(11, 19), "red", seqId, 4, possibleFreqs[0]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(12, 19), "blue", seqId, 4, possibleFreqs[1]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(13, 19), "green", seqId, 4, possibleFreqs[2]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(14, 19), "purple", seqId, 4, possibleFreqs[3])]
+    ));
+
+    taskList.push(new SpawnChoiceSwitchSet(
+        [new ChoiceSwitchSpec(boundsFromCellIndex(14, 16), "red", seqId, 6, possibleFreqs[0]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(15, 16), "blue", seqId, 6, possibleFreqs[1]),
+         new ChoiceSwitchSpec(boundsFromCellIndex(16, 16), "green", seqId, 6, possibleFreqs[2])]
+    ));
+
     taskList.push(new WaitUntilPlayerEntersArea(
-        new Bounds2(new Vec2(0, 22.5), new Vec2(23, 23.5))
+        new Bounds2(new Vec2(5.0, 1.0), new Vec2(18.0, 6.0))
     ));
 
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
 
     taskList.push(new BiggieAndCrissCrossBuzzers());
 
-    taskList.push(new SpawnItteSign(Directions.UP));
+    taskList.push(new SpawnItteSign(Directions.RIGHT));
 
-    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, true, true)));
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(true, true, false, false)));
 
     return taskList;
 }
 
 function defaultTaskList(gameState) {
-    // let taskList = [];
-    // taskList.push(new SetStandardKickPattern());
-    // taskList.push(new InfiniteWaves());
-    // taskList.push(new SpawnKickWave());
-    // taskList.push(new OpenDroneFilterAsEnemiesDieUntilAllDead());
-    // taskList.push(new WaitForLoopStart());
-    // taskList.push(new StationaryShooterWave())
-    // taskList.push(new WaitUntilAllEnemiesDead());
-    // taskList.push(new BigGuyWave());
-    // taskList.push(new WaitUntilAllEnemiesDead());
-    // taskList.push(new WaitForLoopStart());
-    // taskList.push(new MoverWave());
-    // taskList.push(new DumbWave());
-    // return taskList;
-
-    return PRLevel1TaskList();
+    return PRLevel1TaskList(gameState);
 }

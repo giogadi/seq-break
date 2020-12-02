@@ -174,3 +174,7 @@ const Directions = {
     LEFT: 2,
     UP: 3
 };
+
+function boundsFromCellIndex(x, y) {
+    return new Bounds2(new Vec2(x, y), new Vec2(x + 1.0, y + 1.0));
+}

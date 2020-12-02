@@ -208,7 +208,9 @@ class NewRhythmEnemy extends Enemy {
         if (g.newBeat) {
             this.beatUpdate(g);
         }
+        this.updateAux(dt, g);
     }
+    updateAux(dt, g) {}
     beatUpdate(g) {}
 }
 
@@ -280,7 +282,8 @@ class Biggie extends NewRhythmEnemy {
     beatUpdate(g) {
         switch (this.state) {
             case 0: {
-                this.v = new Vec2(0.0, Biggie.speed);
+                let toCamera = vecSub(g.cameraPos, this.pos);
+                this.v = vecScale(vecNormalized(toCamera), Biggie.speed);
                 break;
             }
             case 4: {
@@ -309,5 +312,52 @@ class Biggie extends NewRhythmEnemy {
             default: {}
         }
         ++this.state;
+    }
+}
+
+class Firewheel extends NewRhythmEnemy {
+    constructor(pos, img, numLoopBeats = 8, firstToggleBeat = 0, secondToggleBeat = 4, startActive = true) {
+        super(pos, 1.0, null, null, null);
+        this.img = img;
+        this.sideLength = 0.5;  // 1 / sqrt(2) lol
+        this.active = startActive;
+        this.numLoopBeats = numLoopBeats;
+        this.firstToggleBeat = firstToggleBeat;
+        this.secondToggleBeat = secondToggleBeat;
+        this.beatCounter = 0;
+    }
+    isActive() {
+        return this.active;
+    }
+    static RADIANS_PER_SECOND = Math.PI * 2.0;
+    updateAux(dt, g) {
+        this.heading += Firewheel.RADIANS_PER_SECOND * dt;
+    }
+    draw(canvasCtx, pixelsPerUnit) {   
+        if (!this.isActive()) {
+            return;
+        }
+        // Make the sprite a little bigger than the collision hitbox
+        let size = this.sideLength * 1.4;
+        let sizeInPixels = size * pixelsPerUnit;     
+        canvasCtx.drawImage(
+            this.img, -Math.floor(0.5 * sizeInPixels), -Math.floor(0.5 * sizeInPixels),
+            sizeInPixels, sizeInPixels);
+    }
+    beatUpdate(g) {
+        this.beatCounter = (this.beatCounter + 1) % this.numLoopBeats;
+        if (this.beatCounter === this.firstToggleBeat || this.beatCounter === this.secondToggleBeat) {
+            this.active = !this.active;
+        }
+    }
+    getHurtBox() {
+        return null;
+    }
+    getHitBox() {
+        if (this.isActive()) {
+            return super.getHitBox();
+        } else {
+            return null;
+        }
     }
 }

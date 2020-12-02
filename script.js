@@ -1,6 +1,6 @@
 const ENABLE_SCANNING = false;
 const ENABLE_SUSTAINING = false;
-const ENABLE_SOUND = false;
+const ENABLE_SOUND = true;
 const RENDER_HITBOX = false;
 
 const SequenceType = {
@@ -84,6 +84,8 @@ class GameState {
 
         this.playerSpeed = 6.0;
         this.playerSize = 1.0;
+        this.playerCollisionWidth = 0.1;
+        this.playerCollisionHeight = 1.0;
         this.playerPos = this.tileMapInfo.start;
         this.facingRight = true;
         this.slashDirection = Directions.RIGHT;
@@ -142,7 +144,7 @@ class GameState {
 
         this.entities = [];
         for (let i = 0; i < 10; ++i) {
-            this.entities.push(new Entity());
+            this.entities.push(createDeadEntity());
         }
 
         this.taskList = [];
@@ -387,6 +389,9 @@ function update(g, timeMillis) {
         for (let i = 0; i < g.enemies.length; ++i) {
             let e = g.enemies[i];
             let enemyHurtBox = e.getHurtBox();
+            if (enemyHurtBox === null) {
+                continue;
+            }
             enemyHurtBoxes.push(enemyHurtBox);
             if (!e.alive ||
                 !doConvexPolygonsOverlap(hitBox, enemyHurtBox)) {
@@ -508,8 +513,8 @@ function update(g, timeMillis) {
     if (controlDir.x !== 0 || controlDir.y !== 0) {
         let newPos = vecAdd(
             g.playerPos, vecScale(vecNormalized(controlDir), g.playerSpeed * dt));
-        let newPlayerBounds = boundsFromRect(newPos, g.playerSize, g.playerSize);
-        if (!isBoxInCollisionWithMap(newPos, g.playerSize, g.playerSize, g.tileMapInfo, g.tileSet) &&
+        let newPlayerBounds = boundsFromRect(newPos, g.playerCollisionWidth, g.playerCollisionHeight);
+        if (!isBoxInCollisionWithMap(newPos, g.playerCollisionWidth, g.playerCollisionHeight, g.tileMapInfo, g.tileSet) &&
              doesBounds1ContainBounds2(getCameraBounds(g), newPlayerBounds)) {
             g.playerPos = newPos;
         }
@@ -527,14 +532,15 @@ function update(g, timeMillis) {
     if (g.invulnTimer < 0.0) {
         // TODO: now that Player doesn't rotate, we should simplify the collision calculation.
         let playerHurtBox = getOOBBCornerPoints(
-            g.playerPos, {x: 1.0, y: 0.0}, g.playerSize, g.playerSize);
+            g.playerPos, {x: 1.0, y: 0.0}, g.playerCollisionWidth, g.playerCollisionHeight);
         for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
             let e = g.enemies[eIx];
             if (!e.alive) {
                 continue;
             }
             let enemyHitBox = e.getHitBox();
-            if (doConvexPolygonsOverlap(playerHurtBox, enemyHitBox)) {
+            if (enemyHitBox !== null &&
+                doConvexPolygonsOverlap(playerHurtBox, enemyHitBox)) {
                 playSoundFromBuffer(g.sound.audioCtx, g.sound.drumSounds[2]);
                 g.invulnTimer = 0.0;
                 break;
@@ -653,7 +659,7 @@ function update(g, timeMillis) {
             e.drawBase(g.canvasCtx, g.pixelsPerUnit);
 
             let sizePx = e.sideLength * g.pixelsPerUnit;
-            if (e.seq[g.currentBeatIx].freq < 0) {
+            if (e.seq !== null && e.seq[g.currentBeatIx].freq < 0) {
                 // draw a barrier. First we draw some transparent "glass" and
                 // then we draw an image of glassy glare on top.
                 g.canvasCtx.fillStyle = 'rgba(156, 251, 255, 0.5)';
@@ -694,6 +700,14 @@ function update(g, timeMillis) {
             //     g.canvasCtx.stroke();
             // }
         }
+    }
+
+    for (let i = 0; i < g.entities.length; ++i) {
+        let e = g.entities[i];
+        if (!e.alive || e.screenSpace) {
+            continue;
+        }
+        e.update(g);
     }
 
     // Draw slash
@@ -755,11 +769,22 @@ function update(g, timeMillis) {
         g.canvasCtx.stroke();
     }
 
+    // Handle world-space entities
+    for (let i = 0; i < g.entities.length; ++i) {
+        let e = g.entities[i];
+        if (!e.alive || e.screenSpace) {
+            continue;
+        }
+        e.update(g);
+    }
+
     g.canvasCtx.restore();
+
+    // Handle screen-space entities
 
     for (let i = 0; i < g.entities.length; ++i) {
         let e = g.entities[i];
-        if (!e.alive) {
+        if (!e.alive || !e.screenSpace) {
             continue;
         }
         e.update(g);
@@ -789,6 +814,7 @@ async function loadSprites() {
     let itteUp = await loadImgSync('sprites/itte_up.png');
     let itteRight = await loadImgSync('sprites/itte_right.png');
     let itteDown = await loadImgSync('sprites/itte_down.png');
+    let firewheel = await loadImgSync('sprites/firewheel.png');
     return {
         idleLeft: idleLeft,
         idleRight: idleRight,
@@ -804,7 +830,8 @@ async function loadSprites() {
         itteLeft: itteLeft,
         itteUp: itteUp,
         itteRight: itteRight,
-        itteDown: itteDown
+        itteDown: itteDown,
+        firewheel: firewheel
     };
 }
 
