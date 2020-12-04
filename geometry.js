@@ -67,10 +67,14 @@ function boundsClone(bounds) {
     return new Bounds2(vecClone(bounds.min), vecClone(bounds.max));
 }
 
+function randFromInterval(min, max) {
+    return min + Math.random() * (max - min);
+}
+
 function rand2dInBounds(bounds) {
     return {
-        x: bounds.min.x + Math.random() * (bounds.max.x - bounds.min.x),
-        y: bounds.min.y + Math.random() * (bounds.max.y - bounds.min.y)
+        x: randFromInterval(bounds.min.x, bounds.max.x),
+        y: randFromInterval(bounds.min.y, bounds.max.y)
     };
 }
 

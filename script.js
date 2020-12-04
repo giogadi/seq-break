@@ -143,7 +143,7 @@ class GameState {
         this.prevTimeMillis = -1.0;
 
         this.entities = [];
-        for (let i = 0; i < 10; ++i) {
+        for (let i = 0; i < 50; ++i) {
             this.entities.push(createDeadEntity());
         }
 
@@ -520,6 +520,14 @@ function update(g, timeMillis) {
         }
     }
 
+    // Entity update
+    for (let i = 0; i < g.entities.length; ++i) {
+        if (!g.entities[i].alive) {
+            continue;
+        }
+        g.entities[i].update(g, dt);
+    }
+
     // Enemy behavior update
     for (let eIx = 0; eIx < g.enemies.length; ++eIx) {
         if (!g.enemies[eIx].alive) {
@@ -707,7 +715,7 @@ function update(g, timeMillis) {
         if (!e.alive || e.screenSpace) {
             continue;
         }
-        e.update(g);
+        e.draw(g);
     }
 
     // Draw slash
@@ -775,7 +783,7 @@ function update(g, timeMillis) {
         if (!e.alive || e.screenSpace) {
             continue;
         }
-        e.update(g);
+        e.draw(g);
     }
 
     g.canvasCtx.restore();

@@ -196,6 +196,53 @@ function PRLevel1TaskList(gameState) {
     return taskList;
 }
 
+class LaserRoom extends GameTask {
+    constructor() {
+        super();
+        this.lasers = [];
+    }
+    update(g, dt) {
+        if (this.anyLaserStillAlive(g)) {
+            return false;
+        }
+        this.lasers = [];
+        let bounds = getCameraBounds(g);
+        // Up-and-down
+        let p1First = true;
+        for (let i = 0; i < 6; ++i) {
+            let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
+            let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            p1First = !p1First;
+        }
+
+        // left-to-right
+        for (let i = 0; i < 6; ++i) {
+            let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+            let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            p1First = !p1First;
+        }
+        return false;
+    }
+    anyLaserStillAlive(g) {
+        for (let i = 0; i < this.lasers.length; ++i) {
+            if (g.entities[this.lasers[i]].alive) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+function testTaskList(gameState) {
+    let taskList = [];
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
+    taskList.push(new LaserRoom());
+    return taskList;
+}
+
 function defaultTaskList(gameState) {
-    return PRLevel1TaskList(gameState);
+    // return PRLevel1TaskList(gameState);
+    return testTaskList(gameState);
 }

@@ -148,7 +148,8 @@ class Entity {
         this.alive = true;
         this.screenSpace = false;
     }
-    update(g) {}
+    update(g, dt) {}
+    draw(g) {}
 }
 
 function createDeadEntity() {
@@ -165,7 +166,7 @@ class ItteSign extends Entity {
         this.beatsAlive = 0;
         this.shouldDraw = false;
     }
-    update(g) {
+    draw(g) {
         if (g.newBeat) {
             ++this.beatsAlive;
             if (this.beatsAlive > 32) {
@@ -219,7 +220,7 @@ class ChoiceSwitchSet extends Entity {
         this.switches = switchSpecs;
         this.selectedIx = -1;
     }
-    update(g, dt) {
+    draw(g) {
         if (this.selectedIx < 0) {
             for (let i = 0; i < this.switches.length; ++i) {
                 let s = this.switches[i];
@@ -253,5 +254,54 @@ class SpawnChoiceSwitchSet extends GameTask {
     update(g, dt) {
         g.spawnEntity(new ChoiceSwitchSet(this.switchSpecs));
         return true;
+    }
+}
+
+class LaserBeam extends Entity {
+    constructor(p1, p2) {
+        super();
+        this.p1 = p1;
+        this.p2 = p2;
+        this.t = 0.0;
+    }
+    static TIME_TO_TRACE = 0.5;
+    static TIME_TO_ACTIVE = 1.0;
+    static TIME_TO_INACTIVE = 2.0;
+    update(g, dt) {
+        this.t += dt;
+        if (this.t >= LaserBeam.TIME_TO_INACTIVE) {
+            this.alive = false;
+            return;
+        } else if (this.t >= LaserBeam.TIME_TO_ACTIVE) {
+            if (g.invulnTimer < 0.0) {
+                // TODO: cache this
+                let playerHurtBox = getOOBBCornerPoints(
+                    g.playerPos, {x: 1.0, y: 0.0}, g.playerCollisionWidth, g.playerCollisionHeight);
+                let plane_p = vecClone(this.p1);
+                let plane_n = vecNormalized(rotate90Ccw(vecSub(this.p2, this.p1)));
+                let d = pointPlaneSignedDist(playerHurtBox[0], plane_p, plane_n);
+                for (let i = 1; i < playerHurtBox.length; ++i) {
+                    let new_d = pointPlaneSignedDist(playerHurtBox[i], plane_p, plane_n);
+                    if ((new_d > 0) !== (d > 0)) {
+                        g.invulnTimer = 0.0;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    draw(g, dt) {
+        let fraction = 1.0;
+        let color = 'red';
+        if (this.t <= LaserBeam.TIME_TO_ACTIVE) {
+            fraction = this.t / LaserBeam.TIME_TO_TRACE;
+            color = 'gray'
+        }
+        g.canvasCtx.strokeStyle = color;
+        g.canvasCtx.beginPath();
+        g.canvasCtx.moveTo(this.p1.x * g.pixelsPerUnit, this.p1.y * g.pixelsPerUnit);
+        let endPt = vecAdd(this.p1, vecScale(vecSub(this.p2, this.p1), fraction));
+        g.canvasCtx.lineTo(endPt.x * g.pixelsPerUnit, endPt.y * g.pixelsPerUnit);
+        g.canvasCtx.stroke();
     }
 }
