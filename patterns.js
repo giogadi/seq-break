@@ -235,10 +235,32 @@ class LaserRoom extends GameTask {
     }
 }
 
+class SetTestSequence extends GameTask {
+    constructor(seqId) {
+        super();
+        this.seqId = seqId;
+    }
+    update(g, dt) {
+        let s = g.getSequence(this.seqId);
+        for (let i = 0; i < s.length; ++i) {
+            switch (i % 4) {
+                case 0: s[i].freq = getFreq(NOTES.C, 2); break;
+                case 1: s[i].freq = getFreq(NOTES.E, 2); break;
+                case 2: s[i].freq = getFreq(NOTES.G, 2); break;
+                case 3: s[i].freq = getFreq(NOTES.B_F, 3); break;
+                default: break;
+            }
+        }
+        return true;
+    }
+}
+
 function testTaskList(gameState) {
     let taskList = [];
     taskList.push(new SetStandardKickPattern());
+    taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 2)));
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
+    taskList.push(new StartXYModulator(new SequenceId(SequenceType.SYNTH, 2)));
     taskList.push(new LaserRoom());
     return taskList;
 }

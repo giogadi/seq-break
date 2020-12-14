@@ -304,7 +304,7 @@ class LaserBeam extends Entity {
         if (g.newBeat) {
             ++this.beat;
             switch (this.beat) {
-                case 4: this.state = 1; console.log(this.fraction); break;
+                case 4: this.state = 1; break;
                 case 8: this.state = 2; break;
                 case 16: this.state = 3; break;
                 default: break;
@@ -322,5 +322,46 @@ class LaserBeam extends Entity {
         let endPt = vecAdd(this.p1, vecScale(vecSub(this.p2, this.p1), this.fraction));
         g.canvasCtx.lineTo(endPt.x * g.pixelsPerUnit, endPt.y * g.pixelsPerUnit);
         g.canvasCtx.stroke();
+    }
+}
+
+class XYModulator extends Entity {
+    constructor(seqId, g) {
+        super();
+        this.seqId = seqId;
+        if (seqId.type === SequenceType.SYNTH) {
+            this.releaseCenter = g.sound.synths[seqId.ix].releaseTime;
+        }
+    }
+    update(g, dt) {
+        let bounds = getCameraBounds(g);
+        let x = (g.playerPos.x - bounds.min.x) / (bounds.max.x - bounds.min.x);
+        let y = (g.playerPos.y - bounds.min.y) / (bounds.max.y - bounds.min.y);
+        if (this.seqId.type === SequenceType.SYNTH) {
+            let minRel = 0.1 * this.releaseCenter;
+            let maxRel = 2.0 * this.releaseCenter;
+            g.sound.synths[this.seqId.ix].releaseTime = minRel + x * (maxRel - minRel);
+            let minFilterModGain = 0.0;
+            let maxFilterModGain = 800.0;
+            g.sound.synths[this.seqId.ix].filterModGain.gain.value =
+                minFilterModGain + y * (maxFilterModGain - minFilterModGain);
+        }
+        return false;
+    }
+    cleanup(g) {
+        if (seqId.type === SequenceType.SYNTH) {
+            g.sound.synths[seqId.ix].releaseTime = this.releaseCenter;
+        }
+    }
+}
+
+class StartXYModulator extends GameTask {
+    constructor(seqId) {
+        super();
+        this.seqId = seqId;
+    }
+    update(g, dt) {
+        g.spawnEntity(new XYModulator(this.seqId, g));
+        return true;
     }
 }
