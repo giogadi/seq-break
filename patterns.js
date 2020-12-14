@@ -202,7 +202,7 @@ class LaserRoom extends GameTask {
         this.lasers = [];
     }
     update(g, dt) {
-        if (this.anyLaserStillAlive(g)) {
+        if (this.anyLaserStillAlive(g) || !g.newBeat) {
             return false;
         }
         this.lasers = [];
@@ -237,6 +237,7 @@ class LaserRoom extends GameTask {
 
 function testTaskList(gameState) {
     let taskList = [];
+    taskList.push(new SetStandardKickPattern());
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
     taskList.push(new LaserRoom());
     return taskList;

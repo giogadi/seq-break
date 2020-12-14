@@ -262,45 +262,64 @@ class LaserBeam extends Entity {
         super();
         this.p1 = p1;
         this.p2 = p2;
-        this.t = 0.0;
+        this.beat = 0;
+        this.state = 0;
+        this.fraction = 0.0;
     }
-    static TIME_TO_TRACE = 0.5;
-    static TIME_TO_ACTIVE = 1.0;
-    static TIME_TO_INACTIVE = 2.0;
     update(g, dt) {
-        this.t += dt;
-        if (this.t >= LaserBeam.TIME_TO_INACTIVE) {
-            this.alive = false;
-            return;
-        } else if (this.t >= LaserBeam.TIME_TO_ACTIVE) {
-            if (g.invulnTimer < 0.0) {
-                // TODO: cache this
-                let playerHurtBox = getOOBBCornerPoints(
-                    g.playerPos, {x: 1.0, y: 0.0}, g.playerCollisionWidth, g.playerCollisionHeight);
-                let plane_p = vecClone(this.p1);
-                let plane_n = vecNormalized(rotate90Ccw(vecSub(this.p2, this.p1)));
-                let d = pointPlaneSignedDist(playerHurtBox[0], plane_p, plane_n);
-                for (let i = 1; i < playerHurtBox.length; ++i) {
-                    let new_d = pointPlaneSignedDist(playerHurtBox[i], plane_p, plane_n);
-                    if ((new_d > 0) !== (d > 0)) {
-                        g.invulnTimer = 0.0;
-                        break;
+        switch (this.state) {
+            case 0:
+                // 4 beats of tracing 
+                this.fraction += dt / (g.SECONDS_PER_BEAT * 3);
+                // this.fraction = (this.beat + 1) / 4;
+                break;
+            case 1:
+                // wait before activating
+                break;
+            case 2:
+                // active
+                if (g.invulnTimer < 0.0) {
+                    // TODO: cache this
+                    let playerHurtBox = getOOBBCornerPoints(
+                        g.playerPos, {x: 1.0, y: 0.0}, g.playerCollisionWidth, g.playerCollisionHeight);
+                    let plane_p = vecClone(this.p1);
+                    let plane_n = vecNormalized(rotate90Ccw(vecSub(this.p2, this.p1)));
+                    let d = pointPlaneSignedDist(playerHurtBox[0], plane_p, plane_n);
+                    for (let i = 1; i < playerHurtBox.length; ++i) {
+                        let new_d = pointPlaneSignedDist(playerHurtBox[i], plane_p, plane_n);
+                        if ((new_d > 0) !== (d > 0)) {
+                            g.invulnTimer = 0.0;
+                            break;
+                        }
                     }
                 }
+                break;
+            case 3:
+                // deactivate
+                this.alive = false;
+                return;
+            default:
+                break;
+        }
+        if (g.newBeat) {
+            ++this.beat;
+            switch (this.beat) {
+                case 4: this.state = 1; console.log(this.fraction); break;
+                case 8: this.state = 2; break;
+                case 16: this.state = 3; break;
+                default: break;
             }
         }
     }
     draw(g, dt) {
-        let fraction = 1.0;
-        let color = 'red';
-        if (this.t <= LaserBeam.TIME_TO_ACTIVE) {
-            fraction = this.t / LaserBeam.TIME_TO_TRACE;
-            color = 'gray'
+        let color = 'gray';
+        if (this.state >= 2) {
+            color = 'red';
         }
         g.canvasCtx.strokeStyle = color;
         g.canvasCtx.beginPath();
         g.canvasCtx.moveTo(this.p1.x * g.pixelsPerUnit, this.p1.y * g.pixelsPerUnit);
-        let endPt = vecAdd(this.p1, vecScale(vecSub(this.p2, this.p1), fraction));
+        let endPt = vecAdd(this.p1, vecScale(vecSub(this.p2, this.p1), this.fraction));
         g.canvasCtx.lineTo(endPt.x * g.pixelsPerUnit, endPt.y * g.pixelsPerUnit);
         g.canvasCtx.stroke();
     }
