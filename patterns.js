@@ -243,6 +243,13 @@ class SetTestSequence extends GameTask {
     update(g, dt) {
         let s = g.getSequence(this.seqId);
         for (let i = 0; i < s.length; ++i) {
+            // switch (i) {
+            //     case 0: s[i].freq = getFreq(NOTES.C, 2); break;
+            //     case 4: s[i].freq = getFreq(NOTES.E, 2); break;
+            //     case 8: s[i].freq = getFreq(NOTES.G, 2); break;
+            //     case 12: s[i].freq = getFreq(NOTES.B_F, 3); break;
+            //     default: break;
+            // }
             switch (i % 4) {
                 case 0: s[i].freq = getFreq(NOTES.C, 2); break;
                 case 1: s[i].freq = getFreq(NOTES.E, 2); break;

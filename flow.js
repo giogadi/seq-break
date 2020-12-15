@@ -341,10 +341,15 @@ class XYModulator extends Entity {
             let minRel = 0.1 * this.releaseCenter;
             let maxRel = 2.0 * this.releaseCenter;
             g.sound.synths[this.seqId.ix].releaseTime = minRel + x * (maxRel - minRel);
-            let minFilterModGain = 0.0;
-            let maxFilterModGain = 800.0;
-            g.sound.synths[this.seqId.ix].filterModGain.gain.value =
-                minFilterModGain + y * (maxFilterModGain - minFilterModGain);
+            // g.sound.synths[this.seqId.ix].filterEnvRelease = minRel + x * (maxRel - minRel);
+            let minFilterFreq = 100.0;
+            let maxFilterFreq = 1400.0;
+            g.sound.synths[this.seqId.ix].filterEnvIntensity =
+                minFilterFreq + y * (maxFilterFreq - minFilterFreq);
+            // g.sound.synths[this.seqId.ix].filterDefault =
+            //     minFilterFreq + y * (maxFilterFreq - minFilterFreq);
+            // g.sound.synths[this.seqId.ix].filter.frequency.value =
+            //     minFilterFreq + y * (maxFilterFreq - minFilterFreq);
         }
         return false;
     }

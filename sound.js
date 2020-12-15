@@ -60,7 +60,7 @@ function initSynth(audioCtx, synthSpec, masterGain) {
     filterNode = audioCtx.createBiquadFilter();
     filterNode.type = 'lowpass';
     filterNode.frequency.setValueAtTime(synthSpec.filterCutoff, audioCtx.currentTime);
-    filterNode.Q.value = 0.0;
+    filterNode.Q.value = synthSpec.filterQ;
     filterModFreq = audioCtx.createOscillator();
     filterModFreq.frequency.setValueAtTime(synthSpec.filterModFreq, audioCtx.currentTime);
     filterModGain = audioCtx.createGain();
@@ -116,7 +116,12 @@ function initSynth(audioCtx, synthSpec, masterGain) {
         filterModGain: filterModGain,
         gain: gainNode,
         attackTime: synthSpec.attackTime,
-        releaseTime: synthSpec.releaseTime
+        releaseTime: synthSpec.releaseTime,
+        filterDefault: synthSpec.filterCutoff,
+        // TODO: These should be per-voice.
+        filterEnvAttack: synthSpec.filterEnvAttack,
+        filterEnvRelease: synthSpec.filterEnvRelease,
+        filterEnvIntensity: synthSpec.filterEnvIntensity
     };
 }
 
@@ -138,10 +143,14 @@ function initSound() {
             {
                 gain: 0.25,
                 filterCutoff: 1100,
+                filterQ: 0.0,
                 filterModFreq: 0,
                 filterModGain: 0,
                 attackTime: 0.0,
                 releaseTime: 0.07,
+                filterEnvAttack: 0.0,
+                filterEnvRelease: 0.0,
+                filterEnvIntensity: 0.0,
                 voiceSpecs: [
                     {
                         osc1Type: 'square',
@@ -155,9 +164,13 @@ function initSound() {
                 gain: 0.25,
                 filterCutoff: 1100,
                 filterModFreq: 0,
+                filterQ: 0.0,
                 filterModGain: 0,
                 attackTime: 0.0,
                 releaseTime: 0.07,
+                filterEnvAttack: 0.0,
+                filterEnvRelease: 0.0,
+                filterEnvIntensity: 0.0,
                 voiceSpecs: [
                     {
                         osc1Type: 'square',
@@ -168,19 +181,23 @@ function initSound() {
                 ]
             },
             {
-                // Pad
+                // Filter mod env test
                 gain: 0.25,
-                filterCutoff: 600,
-                filterModFreq: 5,
-                filterModGain: 250,
-                attackTime: 0.01,
-                releaseTime: 0.1,
+                filterCutoff: 100,
+                filterModFreq: 0,
+                filterQ: 16.0,
+                filterModGain: 0,
+                attackTime: 0.0,
+                releaseTime: 0.3,
+                filterEnvAttack: 0.05,
+                filterEnvRelease: 0.1,
+                filterEnvIntensity: 300.0,
                 voiceSpecs: [
                     {
                         osc1Type: 'sawtooth',
                         osc2Type: 'sawtooth',
-                        osc2Gain: 0.7,
-                        osc2Detune: 30
+                        osc2Gain: 0.3,
+                        osc2Detune: -1200
                     }
                 ]
             },
@@ -188,10 +205,14 @@ function initSound() {
                 // Bass
                 gain: 0.5,
                 filterCutoff: 300,
+                filterQ: 0.0,
                 filterModFreq: 0,
                 filterModGain: 0,
                 attackTime: 0.0,
                 releaseTime: 0.5,
+                filterEnvAttack: 0.0,
+                filterEnvRelease: 0.0,
+                filterEnvIntensity: 0.0,
                 voiceSpecs: [
                     { osc1Type: 'square',
                       osc2Type: 'sine',
@@ -254,12 +275,19 @@ function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx, velocity = 1.0
     let voice = synth.voices[voiceIdx];
     voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
     voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
     voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
     voice.gain.gain.linearRampToValueAtTime(velocity, audioCtx.currentTime + synth.attackTime);
     if (!sustain) {
+        // TODO: Why isn't this current + attack + release?
         voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
     }
+
+    synth.filter.frequency.cancelScheduledValues(audioCtx.currentTime);
+    synth.filter.frequency.setValueAtTime(synth.filterDefault, audioCtx.currentTime);
+    synth.filter.frequency.linearRampToValueAtTime(synth.filterDefault + synth.filterEnvIntensity, audioCtx.currentTime + synth.filterEnvAttack);
+    synth.filter.frequency.linearRampToValueAtTime(synth.filterDefault, audioCtx.currentTime + synth.filterEnvAttack + synth.filterEnvRelease);
 }
 
 function synthReleaseVoice(synth, voiceIdx, audioCtx) {
