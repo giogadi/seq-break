@@ -103,6 +103,45 @@ class BiggieAndCrissCrossBuzzers extends GameTask {
     }
 }
 
+class LaserRoom extends GameTask {
+    constructor() {
+        super();
+        this.lasers = [];
+    }
+    update(g, dt) {
+        if (this.anyLaserStillAlive(g) || !g.newBeat) {
+            return false;
+        }
+        this.lasers = [];
+        let bounds = getCameraBounds(g);
+        // Up-and-down
+        let p1First = true;
+        for (let i = 0; i < 6; ++i) {
+            let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
+            let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            p1First = !p1First;
+        }
+
+        // left-to-right
+        for (let i = 0; i < 6; ++i) {
+            let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+            let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            p1First = !p1First;
+        }
+        return false;
+    }
+    anyLaserStillAlive(g) {
+        for (let i = 0; i < this.lasers.length; ++i) {
+            if (g.entities[this.lasers[i]].alive) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
 // TODO: Change the "static" spawn points to hard-coded into one task, not separate tasks.
 function PRLevel1TaskList(gameState) {
     let taskList = [];
@@ -193,46 +232,18 @@ function PRLevel1TaskList(gameState) {
 
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(true, true, false, false)));
 
+    taskList.push(new WaitUntilPlayerEntersArea(
+        new Bounds2(new Vec2(28.0, 0.0), new Vec2(35.0, 12.0))));
+
+    taskList.push(new CopySequence(new SequenceId(SequenceType.SYNTH, 1), new SequenceId(SequenceType.SYNTH, 2)));
+    taskList.push(new ClearSequence(new SequenceId(SequenceType.SYNTH, 1)));
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
+    taskList.push(new StartXYModulator(
+        new SequenceId(SequenceType.SYNTH, 2),
+        ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
+    taskList.push(new LaserRoom());
+
     return taskList;
-}
-
-class LaserRoom extends GameTask {
-    constructor() {
-        super();
-        this.lasers = [];
-    }
-    update(g, dt) {
-        if (this.anyLaserStillAlive(g) || !g.newBeat) {
-            return false;
-        }
-        this.lasers = [];
-        let bounds = getCameraBounds(g);
-        // Up-and-down
-        let p1First = true;
-        for (let i = 0; i < 6; ++i) {
-            let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
-            let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
-            p1First = !p1First;
-        }
-
-        // left-to-right
-        for (let i = 0; i < 6; ++i) {
-            let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
-            p1First = !p1First;
-        }
-        return false;
-    }
-    anyLaserStillAlive(g) {
-        for (let i = 0; i < this.lasers.length; ++i) {
-            if (g.entities[this.lasers[i]].alive) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
 
 class SetTestSequence extends GameTask {
@@ -265,7 +276,9 @@ class SetTestSequence extends GameTask {
 function testTaskList(gameState) {
     let taskList = [];
     taskList.push(new SetStandardKickPattern());
-    taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 2)));
+    taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 1)));
+    taskList.push(new CopySequence(new SequenceId(SequenceType.SYNTH, 1), new SequenceId(SequenceType.SYNTH, 2)));
+    taskList.push(new ClearSequence(new SequenceId(SequenceType.SYNTH, 1)));
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
     taskList.push(new StartXYModulator(
         new SequenceId(SequenceType.SYNTH, 2),
@@ -275,6 +288,6 @@ function testTaskList(gameState) {
 }
 
 function defaultTaskList(gameState) {
-    // return PRLevel1TaskList(gameState);
-    return testTaskList(gameState);
+    return PRLevel1TaskList(gameState);
+    // return testTaskList(gameState);
 }

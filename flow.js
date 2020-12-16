@@ -179,16 +179,35 @@ class ItteSign extends Entity {
         }
         if (this.shouldDraw) {
             let img = null;
+            let x = 0;
+            let y = 0;
             switch(this.direction) {
-                case Directions.UP: img = g.sprites.itteUp; break;
-                case Directions.RIGHT: img = g.sprites.itteRight; break;
-                case Directions.DOWN: img = g.sprites.itteDown; break;
-                case Directions.LEFT: img = g.sprites.itteLeft; break;
+                case Directions.UP: {
+                    img = g.sprites.itteUp;
+                    x = Math.floor(0.2 * g.canvas.width);
+                    y = Math.floor(0.1 * g.canvas.height);
+                    break;
+                }
+                case Directions.RIGHT: {
+                    img = g.sprites.itteRight;
+                    x = Math.floor(0.8 * g.canvas.width);
+                    y = Math.floor(0.1 * g.canvas.height);
+                    break;
+                }
+                case Directions.DOWN: {
+                    img = g.sprites.itteDown;
+                    x = Math.floor(0.2 * g.canvas.width);
+                    y = Math.floor(0.8 * g.canvas.height);
+                    break;
+                }
+                case Directions.LEFT: {
+                    img = g.sprites.itteLeft;
+                    x = Math.floor(0.2 * g.canvas.width);
+                    y = Math.floor(0.1 * g.canvas.height);
+                    break;
+                }
             }
-            g.canvasCtx.drawImage(
-                img,
-                Math.floor(0.2 * g.canvas.width), Math.floor(0.1 * g.canvas.height),
-                4 * g.pixelsPerUnit, 2 * g.pixelsPerUnit);
+            g.canvasCtx.drawImage(img, x, y, 4 * g.pixelsPerUnit, 2 * g.pixelsPerUnit);
         }
     }
 }
@@ -399,6 +418,37 @@ class StartXYModulator extends GameTask {
     }
     update(g, dt) {
         g.spawnEntity(new XYModulator(this.seqId, g, this.xDest, this.yDest));
+        return true;
+    }
+}
+
+class CopySequence extends GameTask {
+    constructor(fromSeqId, toSeqId) {
+        super();
+        this.fromSeqId = fromSeqId;
+        this.toSeqId = toSeqId;
+    }
+    update(g, dt) {
+        let fromSeq = g.getSequence(this.fromSeqId);
+        let toSeq = g.getSequence(this.toSeqId);
+        console.assert(fromSeq.length === toSeq.length);
+        for (let i = 0; i < fromSeq.length; ++i) {
+            toSeq[i].copyFrom(fromSeq[i]);
+        }
+        return true;
+    }
+}
+
+class ClearSequence extends GameTask {
+    constructor(seqId) {
+        super();
+        this.seqId = seqId;
+    }
+    update(g, dt) {
+        let seq = g.getSequence(this.seqId);
+        for (let i = 0; i < seq.length; ++i) {
+            seq[i].reset();
+        }
         return true;
     }
 }

@@ -85,7 +85,7 @@ function findObjectInMapById(tileMapInfo, id) {
 }
 
 function getMapStartPoint(tileMapInfo) {
-    let o = findObjectInMapByName(tileMapInfo, 'start2');
+    let o = findObjectInMapByName(tileMapInfo, 'start');
     if (o === null) {
         console.log('no start point found on tilemap!');
         return { x: 0, y: 0 };

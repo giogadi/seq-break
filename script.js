@@ -37,6 +37,12 @@ class SequenceElement {
         this.velocity = 1.0;
         this.velocityDecreasePerLoop = 0.0;
     }
+    copyFrom(other) {
+        this.freq = other.freq;
+        this.sustain = other.sustain;
+        this.velocity = other.velocity;
+        this.velocityDecreasePerLoop = other.velocityDecreasePerLoop;
+    }
 }
 
 function createConstantSequence(numBeats, freq, loopsUntilGone = 0) {
@@ -710,6 +716,7 @@ function update(g, timeMillis) {
         }
     }
 
+    // Draw world space entities
     for (let i = 0; i < g.entities.length; ++i) {
         let e = g.entities[i];
         if (!e.alive || e.screenSpace) {
@@ -777,25 +784,15 @@ function update(g, timeMillis) {
         g.canvasCtx.stroke();
     }
 
-    // Handle world-space entities
-    for (let i = 0; i < g.entities.length; ++i) {
-        let e = g.entities[i];
-        if (!e.alive || e.screenSpace) {
-            continue;
-        }
-        e.draw(g);
-    }
-
     g.canvasCtx.restore();
 
-    // Handle screen-space entities
-
+    // Draw screen-space entities
     for (let i = 0; i < g.entities.length; ++i) {
         let e = g.entities[i];
         if (!e.alive || !e.screenSpace) {
             continue;
         }
-        e.update(g);
+        e.draw(g);
     }
 
     drawSequence(g.canvasCtx, g.NUM_BEATS, g.currentBeatIx, g.canvas.width, g.canvas.height);
