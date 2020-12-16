@@ -267,7 +267,9 @@ function testTaskList(gameState) {
     taskList.push(new SetStandardKickPattern());
     taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 2)));
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
-    taskList.push(new StartXYModulator(new SequenceId(SequenceType.SYNTH, 2)));
+    taskList.push(new StartXYModulator(
+        new SequenceId(SequenceType.SYNTH, 2),
+        ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
     taskList.push(new LaserRoom());
     return taskList;
 }

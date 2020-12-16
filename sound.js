@@ -183,7 +183,7 @@ function initSound() {
             {
                 // Filter mod env test
                 gain: 0.25,
-                filterCutoff: 100,
+                filterCutoff: 50,
                 filterModFreq: 0,
                 filterQ: 16.0,
                 filterModGain: 0,

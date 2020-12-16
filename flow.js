@@ -325,12 +325,52 @@ class LaserBeam extends Entity {
     }
 }
 
+const ModulatorDest = {
+    GAIN_RELEASE: 0,
+    FILTER_CUTOFF: 1,
+    FILTER_ENV_INTENSITY: 2,
+    FILTER_ENV_RELEASE: 3
+}
+
 class XYModulator extends Entity {
-    constructor(seqId, g) {
+    constructor(seqId, g, xDest, yDest) {
         super();
         this.seqId = seqId;
+        this.xDest = xDest;
+        this.yDest = yDest;
         if (seqId.type === SequenceType.SYNTH) {
             this.releaseCenter = g.sound.synths[seqId.ix].releaseTime;
+        }
+    }
+    updateFromParam(g, dest, p) {
+        switch (dest) {
+            case ModulatorDest.GAIN_RELEASE: {
+                let minRel = 0.05;
+                let maxRel = 0.3;
+                g.sound.synths[this.seqId.ix].releaseTime = minRel + p * (maxRel - minRel);
+                break;
+            }
+            case ModulatorDest.FILTER_CUTOFF: {
+                let minFilterFreq = 100.0;
+                let maxFilterFreq = 1400.0;
+                g.sound.synths[this.seqId.ix].filterDefault =
+                    minFilterFreq + p * (maxFilterFreq - minFilterFreq);
+                break;
+            }
+            case ModulatorDest.FILTER_ENV_INTENSITY: {
+                let minFilterFreq = 0.0;
+                let maxFilterFreq = 2000.0;
+                g.sound.synths[this.seqId.ix].filterEnvIntensity =
+                    minFilterFreq + p * (maxFilterFreq - minFilterFreq);
+                break;
+            }
+            case ModulatorDest.FILTER_ENV_RELEASE: {
+                let minRel = 0.007;
+                let maxRel = 0.14;
+                g.sound.synths[this.seqId.ix].filterEnvRelease = minRel + p * (maxRel - minRel);
+                break;
+            }
+            default: break;
         }
     }
     update(g, dt) {
@@ -338,18 +378,8 @@ class XYModulator extends Entity {
         let x = (g.playerPos.x - bounds.min.x) / (bounds.max.x - bounds.min.x);
         let y = (g.playerPos.y - bounds.min.y) / (bounds.max.y - bounds.min.y);
         if (this.seqId.type === SequenceType.SYNTH) {
-            let minRel = 0.1 * this.releaseCenter;
-            let maxRel = 2.0 * this.releaseCenter;
-            g.sound.synths[this.seqId.ix].releaseTime = minRel + x * (maxRel - minRel);
-            // g.sound.synths[this.seqId.ix].filterEnvRelease = minRel + x * (maxRel - minRel);
-            let minFilterFreq = 100.0;
-            let maxFilterFreq = 1400.0;
-            g.sound.synths[this.seqId.ix].filterEnvIntensity =
-                minFilterFreq + y * (maxFilterFreq - minFilterFreq);
-            // g.sound.synths[this.seqId.ix].filterDefault =
-            //     minFilterFreq + y * (maxFilterFreq - minFilterFreq);
-            // g.sound.synths[this.seqId.ix].filter.frequency.value =
-            //     minFilterFreq + y * (maxFilterFreq - minFilterFreq);
+            this.updateFromParam(g, this.xDest, x);
+            this.updateFromParam(g, this.yDest, y);
         }
         return false;
     }
@@ -361,12 +391,14 @@ class XYModulator extends Entity {
 }
 
 class StartXYModulator extends GameTask {
-    constructor(seqId) {
+    constructor(seqId, xDest, yDest) {
         super();
         this.seqId = seqId;
+        this.xDest = xDest;
+        this.yDest = yDest;
     }
     update(g, dt) {
-        g.spawnEntity(new XYModulator(this.seqId, g));
+        g.spawnEntity(new XYModulator(this.seqId, g, this.xDest, this.yDest));
         return true;
     }
 }
