@@ -109,9 +109,22 @@ class LaserRoom extends GameTask {
         this.lasers = [];
     }
     update(g, dt) {
-        if (this.anyLaserStillAlive(g) || !g.newBeat) {
+        if (!g.newBeat) {
             return false;
         }
+        let freqs = [];
+        for (let i = 0; i < this.lasers.length; ++i) {
+            let laser = g.entities[this.lasers[i]];
+            if (laser.alive && laser.steppedOn && laser.beat === 8) {
+                freqs.push(laser.freq);
+            }
+        }
+        synthPlayVoices(g.sound.synths[4], freqs, g.sound.audioCtx);
+        if (this.anyLaserStillAlive(g)) {
+            return false;
+        }
+        let possibleNotes =
+            [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A, NOTES.B_F].map(n => getFreq(n, 2));
         this.lasers = [];
         let bounds = getCameraBounds(g);
         // Up-and-down
@@ -119,7 +132,9 @@ class LaserRoom extends GameTask {
         for (let i = 0; i < 6; ++i) {
             let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
             let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            //let f = possibleNotes[Math.floor(Math.random() * possibleNotes.length)];
+            let f = possibleNotes[i % possibleNotes.length];
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
             p1First = !p1First;
         }
 
@@ -127,7 +142,9 @@ class LaserRoom extends GameTask {
         for (let i = 0; i < 6; ++i) {
             let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
             let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1)));
+            // let f = possibleNotes[Math.floor(Math.random() * possibleNotes.length)];
+            let f = possibleNotes[i % possibleNotes.length];
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
             p1First = !p1First;
         }
         return false;
@@ -276,7 +293,7 @@ class SetTestSequence extends GameTask {
 function testTaskList(gameState) {
     let taskList = [];
     taskList.push(new SetStandardKickPattern());
-    taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 1)));
+    // taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 1)));
     taskList.push(new CopySequence(new SequenceId(SequenceType.SYNTH, 1), new SequenceId(SequenceType.SYNTH, 2)));
     taskList.push(new ClearSequence(new SequenceId(SequenceType.SYNTH, 1)));
     taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
@@ -288,6 +305,6 @@ function testTaskList(gameState) {
 }
 
 function defaultTaskList(gameState) {
-    return PRLevel1TaskList(gameState);
-    // return testTaskList(gameState);
+    // return PRLevel1TaskList(gameState);
+    return testTaskList(gameState);
 }

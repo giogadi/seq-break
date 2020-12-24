@@ -277,23 +277,39 @@ class SpawnChoiceSwitchSet extends GameTask {
 }
 
 class LaserBeam extends Entity {
-    constructor(p1, p2) {
+    constructor(p1, p2, freq) {
         super();
         this.p1 = p1;
         this.p2 = p2;
         this.beat = 0;
         this.state = 0;
         this.fraction = 0.0;
+        this.steppedOn = false;
+        this.freq = freq;
     }
     update(g, dt) {
         switch (this.state) {
             case 0:
                 // 4 beats of tracing 
                 this.fraction += dt / (g.SECONDS_PER_BEAT * 3);
-                // this.fraction = (this.beat + 1) / 4;
                 break;
             case 1:
                 // wait before activating
+                if (this.steppedOn) {
+                    break;
+                }
+                let playerHurtBox = getOOBBCornerPoints(
+                    g.playerPos, {x: 1.0, y: 0.0}, g.playerCollisionWidth, g.playerCollisionHeight);
+                let plane_p = vecClone(this.p1);
+                let plane_n = vecNormalized(rotate90Ccw(vecSub(this.p2, this.p1)));
+                let d = pointPlaneSignedDist(playerHurtBox[0], plane_p, plane_n);
+                for (let i = 1; i < playerHurtBox.length; ++i) {
+                    let new_d = pointPlaneSignedDist(playerHurtBox[i], plane_p, plane_n);
+                    if ((new_d > 0) !== (d > 0)) {
+                        this.steppedOn = true;
+                        break;
+                    }
+                }
                 break;
             case 2:
                 // active
@@ -334,6 +350,8 @@ class LaserBeam extends Entity {
         let color = 'gray';
         if (this.state >= 2) {
             color = 'red';
+        } else if (this.steppedOn) {
+            color = 'blue';
         }
         g.canvasCtx.strokeStyle = color;
         g.canvasCtx.beginPath();

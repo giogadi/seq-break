@@ -219,6 +219,37 @@ function initSound() {
                       osc2Gain: 0.0,
                       osc2Detune: 0.0 }
                 ]
+            },
+            {
+                // Laserbeam chord
+                gain: 0.25,
+                filterCutoff: 1000.0,
+                filterQ: 0.0,
+                filterModFreq: 0,
+                filterModGain: 0,
+                attackTime: 0.5,
+                releaseTime: 1.0,
+                filterEnvAttack: 0.0,
+                filterEnvRelease: 0.0,
+                filterEnvIntensity: 0.0,
+                voiceSpecs: [
+                    { osc1Type: 'sawtooth',
+                      osc2Type: 'sawtooth',
+                      osc2Gain: 0.8,
+                      osc2Detune: 20.0 },
+                    { osc1Type: 'sawtooth',
+                      osc2Type: 'sawtooth',
+                      osc2Gain: 0.8,
+                      osc2Detune: 20.0 },
+                    { osc1Type: 'sawtooth',
+                      osc2Type: 'sawtooth',
+                      osc2Gain: 0.8,
+                      osc2Detune: 20.0 },
+                    { osc1Type: 'sawtooth',
+                      osc2Type: 'sawtooth',
+                      osc2Gain: 0.8,
+                      osc2Detune: 20.0 }
+                ]
             }
         ];
         let synths = [];
@@ -284,6 +315,29 @@ function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx, velocity = 1.0
         voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
     }
 
+    synth.filter.frequency.cancelScheduledValues(audioCtx.currentTime);
+    synth.filter.frequency.setValueAtTime(synth.filterDefault, audioCtx.currentTime);
+    synth.filter.frequency.linearRampToValueAtTime(synth.filterDefault + synth.filterEnvIntensity, audioCtx.currentTime + synth.filterEnvAttack);
+    synth.filter.frequency.linearRampToValueAtTime(synth.filterDefault, audioCtx.currentTime + synth.filterEnvAttack + synth.filterEnvRelease);
+}
+
+// TODO: dedup with above function.
+function synthPlayVoices(synth, freqs, audioCtx, velocity = 1.0) {
+    let seenFreqs = new Set();
+    for (let i = 0; i < freqs.length && i < synth.voices.length; ++i) {
+        if (seenFreqs.has[freqs[i]]) {
+            continue;
+        }
+        seenFreqs.add(freqs[i]);
+        let voice = synth.voices[i];
+        voice.osc1.frequency.setValueAtTime(freqs[i], audioCtx.currentTime);
+        voice.osc2.frequency.setValueAtTime(freqs[i], audioCtx.currentTime);
+
+        voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+        voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+        voice.gain.gain.linearRampToValueAtTime(velocity, audioCtx.currentTime + synth.attackTime);
+        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
+    }
     synth.filter.frequency.cancelScheduledValues(audioCtx.currentTime);
     synth.filter.frequency.setValueAtTime(synth.filterDefault, audioCtx.currentTime);
     synth.filter.frequency.linearRampToValueAtTime(synth.filterDefault + synth.filterEnvIntensity, audioCtx.currentTime + synth.filterEnvAttack);
