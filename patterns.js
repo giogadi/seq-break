@@ -119,31 +119,34 @@ class LaserRoom extends GameTask {
                 freqs.push(laser.freq);
             }
         }
-        synthPlayVoices(g.sound.synths[4], freqs, g.sound.audioCtx);
+        if (freqs.length > 0) {
+            synthPlayVoices(g.sound.synths[4], freqs, g.sound.audioCtx);
+        }
         if (this.anyLaserStillAlive(g)) {
             return false;
         }
         let possibleNotes =
             [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A, NOTES.B_F].map(n => getFreq(n, 2));
+        possibleNotes = possibleNotes.concat(
+            [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A, NOTES.B_F].map(n => getFreq(n, 3)));
         this.lasers = [];
         let bounds = getCameraBounds(g);
         // Up-and-down
         let p1First = true;
-        for (let i = 0; i < 6; ++i) {
+        let laserIx = 0;
+        for (; laserIx < 6; ++laserIx) {
             let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
             let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
-            //let f = possibleNotes[Math.floor(Math.random() * possibleNotes.length)];
-            let f = possibleNotes[i % possibleNotes.length];
+            let f = possibleNotes[laserIx % possibleNotes.length];
             this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
             p1First = !p1First;
         }
 
         // left-to-right
-        for (let i = 0; i < 6; ++i) {
+        for (; laserIx < 12; ++laserIx) {
             let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
             let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            // let f = possibleNotes[Math.floor(Math.random() * possibleNotes.length)];
-            let f = possibleNotes[i % possibleNotes.length];
+            let f = possibleNotes[laserIx % possibleNotes.length];
             this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
             p1First = !p1First;
         }
@@ -258,6 +261,8 @@ function PRLevel1TaskList(gameState) {
     taskList.push(new StartXYModulator(
         new SequenceId(SequenceType.SYNTH, 2),
         ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
+
+    taskList.push(new WaitForLoopStart());
     taskList.push(new LaserRoom());
 
     return taskList;

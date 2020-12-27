@@ -222,16 +222,17 @@ function initSound() {
             },
             {
                 // Laserbeam chord
-                gain: 0.25,
-                filterCutoff: 1000.0,
-                filterQ: 0.0,
+                // gain: 0.25,
+                gain: 0.1,
+                filterCutoff: 100.0,
+                filterQ: 10.0,
                 filterModFreq: 0,
                 filterModGain: 0,
                 attackTime: 0.5,
                 releaseTime: 1.0,
-                filterEnvAttack: 0.0,
-                filterEnvRelease: 0.0,
-                filterEnvIntensity: 0.0,
+                filterEnvAttack: 0.1,
+                filterEnvRelease: 1.0,
+                filterEnvIntensity: 900.0,
                 voiceSpecs: [
                     { osc1Type: 'sawtooth',
                       osc2Type: 'sawtooth',
