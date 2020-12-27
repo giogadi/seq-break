@@ -119,8 +119,21 @@ class LaserRoom extends GameTask {
                 freqs.push(laser.freq);
             }
         }
+        const seqId = new SequenceId(SequenceType.SYNTH, 4);
+        let seq = g.getSequence(seqId);
         if (freqs.length > 0) {
-            synthPlayVoices(g.sound.synths[4], freqs, g.sound.audioCtx);
+            if (freqs.length <= 4) {
+                for (let i = 0; i < 4; ++i) {
+                    let f = (i < freqs.length) ? freqs[i] : -1;
+                    for (let j = 0; j < 4; ++j) {
+                        seq[(g.currentBeatIx + i + 4*j) % seq.length].freq = f;
+                    }
+                }
+            } else {
+                for (let i = 0; i < seq.length; ++i) {
+                    seq[(g.currentBeatIx + i) % seq.length].freq = freqs[i % freqs.length];
+                }
+            }
         }
         if (this.anyLaserStillAlive(g)) {
             return false;

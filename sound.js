@@ -116,6 +116,8 @@ function initSynth(audioCtx, synthSpec, masterGain) {
         filterModGain: filterModGain,
         gain: gainNode,
         attackTime: synthSpec.attackTime,
+        decayTime: (synthSpec.decayTime === undefined) ? 0.0 : synthSpec.decayTime,
+        sustainLevel: (synthSpec.sustainLevel === undefined) ? 1.0 : synthSpec.sustainLevel,
         releaseTime: synthSpec.releaseTime,
         filterDefault: synthSpec.filterCutoff,
         // TODO: These should be per-voice.
@@ -222,22 +224,23 @@ function initSound() {
             },
             {
                 // Laserbeam chord
-                // gain: 0.25,
-                gain: 0.1,
-                filterCutoff: 100.0,
-                filterQ: 10.0,
+                gain: 0.25,
+                filterCutoff: 3000.0,
+                filterQ: 0.0,
                 filterModFreq: 0,
                 filterModGain: 0,
-                attackTime: 0.5,
-                releaseTime: 1.0,
-                filterEnvAttack: 0.1,
-                filterEnvRelease: 1.0,
-                filterEnvIntensity: 900.0,
+                attackTime: 0.001,
+                decayTime: 0.025,
+                sustainLevel: 0.1,
+                releaseTime: 0.2,
+                filterEnvAttack: 0.0,
+                filterEnvRelease: 0.0,
+                filterEnvIntensity: 0.0,
                 voiceSpecs: [
                     { osc1Type: 'sawtooth',
                       osc2Type: 'sawtooth',
                       osc2Gain: 0.8,
-                      osc2Detune: 20.0 },
+                      osc2Detune: 30.0 },
                     { osc1Type: 'sawtooth',
                       osc2Type: 'sawtooth',
                       osc2Gain: 0.8,
@@ -303,18 +306,21 @@ function initSound() {
     });
 }
 
+function adsrEnvelope(audioParam, currentTime, velocity, attackTime, decayTime, sustainLevel, releaseTime) {
+    audioParam.cancelScheduledValues(currentTime);
+    audioParam.setValueAtTime(0.0, currentTime);
+    audioParam.linearRampToValueAtTime(velocity, currentTime + attackTime);
+    audioParam.linearRampToValueAtTime(sustainLevel * velocity, currentTime + attackTime + decayTime)
+    audioParam.linearRampToValueAtTime(0.0, currentTime + attackTime + decayTime + releaseTime);
+}
+
 function synthPlayVoice(synth, voiceIdx, freq, sustain, audioCtx, velocity = 1.0) {
     let voice = synth.voices[voiceIdx];
     voice.osc1.frequency.setValueAtTime(freq, audioCtx.currentTime);
     voice.osc2.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-    voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
-    voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-    voice.gain.gain.linearRampToValueAtTime(velocity, audioCtx.currentTime + synth.attackTime);
-    if (!sustain) {
-        // TODO: Why isn't this current + attack + release?
-        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
-    }
+    adsrEnvelope(voice.gain.gain, audioCtx.currentTime, velocity, synth.attackTime,
+        synth.decayTime, synth.sustainLevel, synth.releaseTime);
 
     synth.filter.frequency.cancelScheduledValues(audioCtx.currentTime);
     synth.filter.frequency.setValueAtTime(synth.filterDefault, audioCtx.currentTime);
@@ -334,10 +340,8 @@ function synthPlayVoices(synth, freqs, audioCtx, velocity = 1.0) {
         voice.osc1.frequency.setValueAtTime(freqs[i], audioCtx.currentTime);
         voice.osc2.frequency.setValueAtTime(freqs[i], audioCtx.currentTime);
 
-        voice.gain.gain.cancelScheduledValues(audioCtx.currentTime);
-        voice.gain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-        voice.gain.gain.linearRampToValueAtTime(velocity, audioCtx.currentTime + synth.attackTime);
-        voice.gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + synth.releaseTime);
+        adsrEnvelope(voice.gain.gain, audioCtx.currentTime, velocity, synth.attackTime,
+            synth.decayTime, synth.sustainLevel, synth.releaseTime);
     }
     synth.filter.frequency.cancelScheduledValues(audioCtx.currentTime);
     synth.filter.frequency.setValueAtTime(synth.filterDefault, audioCtx.currentTime);
