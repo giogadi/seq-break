@@ -225,7 +225,7 @@ function initSound() {
             {
                 // Laserbeam chord
                 gain: 0.25,
-                filterCutoff: 3000.0,
+                filterCutoff: 10000.0,
                 filterQ: 0.0,
                 filterModFreq: 0,
                 filterModGain: 0,

@@ -277,23 +277,32 @@ class SpawnChoiceSwitchSet extends GameTask {
 }
 
 class LaserBeam extends Entity {
-    constructor(p1, p2, freq) {
+    constructor(p1, p2, freq, movesVertically) {
         super();
         this.p1 = p1;
+        this.p1v = new Vec2(0.0, 0.0);
         this.p2 = p2;
+        this.p2v = new Vec2(0.0, 0.0);
         this.beat = 0;
         this.state = 0;
-        this.fraction = 0.0;
         this.steppedOn = false;
         this.freq = freq;
+        this.movesVertically = movesVertically;
+
+        this.setNewVelocity();
+    }
+    setNewVelocity() {
+        if (this.movesVertically) {
+            this.p1v.y = Math.random() < 0.5 ? -0.5 : 0.5;
+            this.p2v.y = Math.random() < 0.5 ? -0.5 : 0.5;
+        } else {
+            this.p1v.x = Math.random() < 0.5 ? -0.5 : 0.5;
+            this.p2v.x = Math.random() < 0.5 ? -0.5 : 0.5;
+        }
     }
     update(g, dt) {
         switch (this.state) {
-            case 0:
-                // 4 beats of tracing 
-                this.fraction += dt / (g.SECONDS_PER_BEAT * 3);
-                break;
-            case 1:
+            case 0: {
                 // wait before activating
                 if (this.steppedOn) {
                     break;
@@ -311,7 +320,8 @@ class LaserBeam extends Entity {
                     }
                 }
                 break;
-            case 2:
+            }
+            case 1: {
                 // active
                 if (g.invulnTimer < 0.0) {
                     // TODO: cache this
@@ -329,26 +339,26 @@ class LaserBeam extends Entity {
                     }
                 }
                 break;
-            case 3:
-                // deactivate
-                this.alive = false;
-                return;
+            }
             default:
                 break;
         }
+
+        this.p1 = vecAdd(this.p1, vecScale(this.p1v, dt));
+        this.p2 = vecAdd(this.p2, vecScale(this.p2v, dt));
+
         if (g.newBeat) {
             ++this.beat;
             switch (this.beat) {
-                case 4: this.state = 1; break;
-                case 8: this.state = 2; break;
-                case 16: this.state = 3; break;
+                case 8: this.state = 1; break;
+                case 16: this.state = 0; this.beat = 0; this.steppedOn = false; this.setNewVelocity(); break;
                 default: break;
             }
         }
     }
     draw(g, dt) {
         let color = 'gray';
-        if (this.state >= 2) {
+        if (this.state === 1) {
             color = 'red';
         } else if (this.steppedOn) {
             color = 'blue';
@@ -356,7 +366,7 @@ class LaserBeam extends Entity {
         g.canvasCtx.strokeStyle = color;
         g.canvasCtx.beginPath();
         g.canvasCtx.moveTo(this.p1.x * g.pixelsPerUnit, this.p1.y * g.pixelsPerUnit);
-        let endPt = vecAdd(this.p1, vecScale(vecSub(this.p2, this.p1), this.fraction));
+        let endPt = this.p2;
         g.canvasCtx.lineTo(endPt.x * g.pixelsPerUnit, endPt.y * g.pixelsPerUnit);
         g.canvasCtx.stroke();
     }

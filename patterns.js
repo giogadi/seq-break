@@ -104,8 +104,9 @@ class BiggieAndCrissCrossBuzzers extends GameTask {
 }
 
 class LaserRoom extends GameTask {
-    constructor() {
+    constructor(bounds) {
         super();
+        this.bounds = bounds;
         this.lasers = [];
     }
     update(g, dt) {
@@ -143,26 +144,27 @@ class LaserRoom extends GameTask {
         possibleNotes = possibleNotes.concat(
             [NOTES.C, NOTES.D, NOTES.E, NOTES.G, NOTES.A, NOTES.B_F].map(n => getFreq(n, 3)));
         this.lasers = [];
-        let bounds = getCameraBounds(g);
+        let bounds = this.bounds;
+
         // Up-and-down
         let p1First = true;
         let laserIx = 0;
-        for (; laserIx < 6; ++laserIx) {
+        for (; laserIx < 28; ++laserIx) {
             let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
             let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
             let f = possibleNotes[laserIx % possibleNotes.length];
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f, false)));
             p1First = !p1First;
         }
 
         // left-to-right
-        for (; laserIx < 12; ++laserIx) {
-            let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-            let f = possibleNotes[laserIx % possibleNotes.length];
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f)));
-            p1First = !p1First;
-        }
+        // for (; laserIx < 36; ++laserIx) {
+        //     let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+        //     let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
+        //     let f = possibleNotes[laserIx % possibleNotes.length];
+        //     this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f, true)));
+        //     p1First = !p1First;
+        // }
         return false;
     }
     anyLaserStillAlive(g) {
@@ -314,23 +316,12 @@ function testTaskList(g) {
     // taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 1)));
     taskList.push(new CopySequence(new SequenceId(SequenceType.SYNTH, 1), new SequenceId(SequenceType.SYNTH, 2)));
     taskList.push(new ClearSequence(new SequenceId(SequenceType.SYNTH, 1)));
-    taskList.push(new SetCameraFollowMode(new CameraFollowMode(false, false, false, false)));
-    taskList.push(new StartXYModulator(
-        new SequenceId(SequenceType.SYNTH, 2),
-        ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
+    taskList.push(new SetCameraFollowMode(new CameraFollowMode(true, false, false, false)));
+    // taskList.push(new StartXYModulator(
+    //     new SequenceId(SequenceType.SYNTH, 2),
+    //     ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
 
-    let seqId = new SequenceId(SequenceType.SAMPLE, 1);
-    let seq = createConstantSequence(16, 0);
-    let p = vecAdd(g.playerPos, new Vec2(3.0, 3.0));
-    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
-    p = vecAdd(g.playerPos, new Vec2(-3.0, 3.0));
-    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
-    p = vecAdd(g.playerPos, new Vec2(3.0, -3.0));
-    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
-    p = vecAdd(g.playerPos, new Vec2(-3.0, -3.0));
-    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
-
-    taskList.push(new LaserRoom());
+    taskList.push(new LaserRoom(g.tileMapInfo.laserRoomBounds));
     return taskList;
 }
 

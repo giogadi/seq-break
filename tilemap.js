@@ -128,12 +128,24 @@ async function loadTileMap(name) {
         });
     }
 
+    let laserRoomBounds = null;
+    let laserRoomInfo = findObjectInMapByName(tileMapInfo, 'lasers');
+    if (laserRoomInfo !== null) {
+        laserRoomBounds = {
+            min: { x: laserRoomInfo.x / tileMapInfo.tilewidth, y: laserRoomInfo.y / tileMapInfo.tilewidth },
+            max: {
+                x: (laserRoomInfo.x + laserRoomInfo.width) / tileMapInfo.tilewidth,
+                y: (laserRoomInfo.y + laserRoomInfo.height) / tileMapInfo.tilewidth }
+        };
+    }
+
     return {
         info: tileMapInfo,
         width: tileMapInfo.layers[0].width,
         height: tileMapInfo.layers[0].height,
         start: start,
-        rooms: rooms
+        rooms: rooms,
+        laserRoomBounds: laserRoomBounds
     }
 }
 
