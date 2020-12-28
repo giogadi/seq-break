@@ -214,6 +214,34 @@ class NewRhythmEnemy extends Enemy {
     beatUpdate(g) {}
 }
 
+class Rando extends NewRhythmEnemy {
+    constructor(pos, sideLength, soundSeq, sequenceId, color) {
+        super(pos, sideLength, soundSeq, sequenceId, color);
+        this.state = 0;
+        this.speed = 5.0;
+        this.checkMapCollisions = true;
+    }
+    beatUpdate(g) {
+        switch (this.state) {
+            case 0: {
+                this.v = new Vec2(0.0, 0.0);
+                break;
+            }
+            case 2: {
+                let target = rand2dInBounds(getCameraBounds(g));
+                this.v = vecScale(vecNormalized(vecSub(target, this.pos)), this.speed);
+                break;
+            }
+            case 3: {
+                this.state = -1;
+                break;
+            }
+            default: break;
+        }
+        ++this.state;
+    }
+}
+
 class Buzzer extends NewRhythmEnemy {
     constructor(pos, sideLength, soundSeq, sequenceId, color, initState = 0) {
         super(pos, sideLength, soundSeq, sequenceId, color);

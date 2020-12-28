@@ -308,7 +308,7 @@ class SetTestSequence extends GameTask {
     }
 }
 
-function testTaskList(gameState) {
+function testTaskList(g) {
     let taskList = [];
     taskList.push(new SetStandardKickPattern());
     // taskList.push(new SetTestSequence(new SequenceId(SequenceType.SYNTH, 1)));
@@ -318,6 +318,18 @@ function testTaskList(gameState) {
     taskList.push(new StartXYModulator(
         new SequenceId(SequenceType.SYNTH, 2),
         ModulatorDest.GAIN_RELEASE, ModulatorDest.FILTER_ENV_INTENSITY));
+
+    let seqId = new SequenceId(SequenceType.SAMPLE, 1);
+    let seq = createConstantSequence(16, 0);
+    let p = vecAdd(g.playerPos, new Vec2(3.0, 3.0));
+    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
+    p = vecAdd(g.playerPos, new Vec2(-3.0, 3.0));
+    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
+    p = vecAdd(g.playerPos, new Vec2(3.0, -3.0));
+    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
+    p = vecAdd(g.playerPos, new Vec2(-3.0, -3.0));
+    taskList.push(new SpawnEnemyNew(new Enemy(p, 1.0, seq, seqId, 'green')));
+
     taskList.push(new LaserRoom());
     return taskList;
 }
