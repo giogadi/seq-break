@@ -146,25 +146,26 @@ class LaserRoom extends GameTask {
         this.lasers = [];
         let bounds = this.bounds;
 
-        // Up-and-down
-        let p1First = true;
-        let laserIx = 0;
-        for (; laserIx < 28; ++laserIx) {
-            let p1 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.min.y - 1.0);
-            let p2 = new Vec2(randFromInterval(bounds.min.x, bounds.max.x), bounds.max.y + 1.0);
-            let f = possibleNotes[laserIx % possibleNotes.length];
-            this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f, false)));
-            p1First = !p1First;
+        const NUM_LASERS = 50;
+        let endPts = new Array(NUM_LASERS);
+        for (let i = 0; i < endPts.length; ++i) {
+            endPts[i] = i;
+        }
+        const BATCH_SIZE = 18;
+        const NUM_BATCHES = Math.ceil(NUM_LASERS / BATCH_SIZE);
+        for (let batch = 0; batch < NUM_BATCHES; ++batch) {
+            let shuffleStartIx = batch * BATCH_SIZE;
+            let shuffleEndIx = Math.min(endPts.length, (batch + 1) * BATCH_SIZE);
+            shuffleArray(endPts, shuffleStartIx, shuffleEndIx);
         }
 
-        // left-to-right
-        // for (; laserIx < 36; ++laserIx) {
-        //     let p1 = new Vec2(bounds.min.x - 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-        //     let p2 = new Vec2(bounds.max.x + 1.0, randFromInterval(bounds.min.y, bounds.max.y));
-        //     let f = possibleNotes[laserIx % possibleNotes.length];
-        //     this.lasers.push(g.spawnEntity(new LaserBeam(p1First ? p1 : p2, p1First ? p2 : p1, f, true)));
-        //     p1First = !p1First;
-        // }
+        for (let laserIx = 0; laserIx < NUM_LASERS; ++laserIx) {
+            let p1 = new Vec2(lerp(bounds.min.x, bounds.max.x, laserIx / NUM_LASERS), bounds.min.y - 1.0);
+            let p2 = new Vec2(lerp(bounds.min.x, bounds.max.x, endPts[laserIx] / NUM_LASERS), bounds.max.y + 1.0);
+            let f = possibleNotes[laserIx % possibleNotes.length];
+            this.lasers.push(g.spawnEntity(new LaserBeam(p1, p2, f, false)));
+        }
+        
         return false;
     }
     anyLaserStillAlive(g) {
